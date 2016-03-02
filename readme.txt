@@ -1,5 +1,12 @@
 Changelog
 
+1.1
+World size decreased to 100x100 by default.
+Info tab text revised.
+New shape for divers.
+Added contact in info tab (for feedback).
+World changed from black to dark blue with squares (for scale).
+
 1.0
 Added buttons to follow divers.
 Added a "clear outputs" button.
