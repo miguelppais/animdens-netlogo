@@ -1,5 +1,13 @@
 Changelog
 
+1.0
+Added buttons to follow divers.
+Added a "clear outputs" button.
+Added some guides directly on the interface.
+Diver.memory switch removed.
+"reset to defaults" button now resets values and runs setup automatically.
+Re-arranged the interface to fit the new text notes.
+
 0.9
 Added a bias calculator to use after model runs.
 Input for shark movement parameters became free and not restricted to pre-determined options.
