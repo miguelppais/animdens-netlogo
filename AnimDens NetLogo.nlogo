@@ -1,16 +1,26 @@
+;Simulation model: AnimDens
+;Original model implemented in R by Christine Ward-Paige
+;Adapted and implemented in NetLogo by Miguel Pessanha Pais
+
+;This is a model that simulates divers counting sharks while deploying the belt-transect and stationary-
+;point-count underwater visual census techniques. The model assumes an area that is featureless and flat. The depth 
+;is ignored and assumed constant. For each simulation, the divers start in the middle and face in the same 
+;direction. At each time step (which is set by the user) divers count the number of fish they can see based
+;on the direction the diver is facing, the visibility distance (set by the user) and the angle of which the 
+;diver can see at a given time step (set by the user). The fish move at a speed specified by the user, and 
+;travel in a direction that is restricted (selected angle is set by the user) based on the previous direction. 
+;Fish that reach the boundaries of the area wrap around to the opposite side (in the original model they could leave the area).
+;By default, divers do not recount fish.
+
 ;Global variables not represented in the main screen
 
 globals[
   actual.area
-  diver.depth
-  max.depth
   transdiver.viewangle
   statdiver.viewangle
   rovdiver.viewangle
   transect.diver.mean.speed
-  transect.diver.range.speed
   roving.diver.mean.speed
-  roving.diver.range.speed
   transect.area
   stationary.area
 ]
@@ -57,20 +67,17 @@ rovdivers-own [
 
 to setup
   ca
-  stop-inspecting-dead-agents                               ; close any windows inspecting agents
+  stop-inspecting-dead-agents                           ; clears diver detail windows from previous simulation runs
   set actual.area world-height * world-width
   set transdiver.viewangle 180
   set statdiver.viewangle 160
   set rovdiver.viewangle 160
   set transect.diver.mean.speed (transect.diver.speed / 60)  ; these 4 lines just convert interface speeds (in m/min) to m/s
-  set transect.diver.range.speed (t.range.speed / 60)
   set roving.diver.mean.speed (roving.diver.speed / 60)
-  set roving.diver.range.speed (r.range.speed / 60)
   
-  ; on the original model, the final part of the sampled area of the transect is assumed to be a rectangle (transect.width x visibility.length),
-  ; when what is surveyed in fact is an intersection of a semi-circle (view cone) with the area inside the transect.
+  ; on the original model, the final part of the sampled area of the transect is assumed to be a rectangle (transect.width x visibility.length)
   
-  set transect.area transect.width * (transect.diver.mean.speed * survey.time) + transect.width * visibility.length         ; if there is stochasticity in diver speed, this must be calculated at the end
+  set transect.area transect.width * (transect.diver.mean.speed * survey.time) + transect.width * visibility.length
   set stationary.area pi * stationary.radius ^ 2
  
 ; if shark density is set to some number, then use that to calculate the number of sharks to deploy. Otherwise, just use the numb.sharks.
@@ -84,6 +91,7 @@ to setup
    set size 1      
    set species "Sp1"                                          ; in case of a single species
    ;set species item random 5 ["Sp1" "Sp2" "Sp3" "Sp4" "Sp5"]   ; in case there are multiple species (deactivate one of them)
+   set speed shark.mean.speed
   ]
   
 if transect.diver? = true [                                         ;transect diver setup
@@ -93,7 +101,8 @@ if transect.diver? = true [                                         ;transect di
  set color blue
  set size 1.7
  setxy (world-width / 2) (world-height / 2)
- if show.paths? = true [pen-down]                                                          ;this shows the path of the diver
+ if show.paths? = true [pen-down]                                                           ;this shows the path of the diver
+ set speed transect.diver.mean.speed
  set counted.sharks [] ; sets counted.sharks as an empty list
 ]
 ]
@@ -101,7 +110,7 @@ if transect.diver? = true [                                         ;transect di
 if stationary.diver? = true [                                      ;stationary diver setup
   create-statdivers 1 [
  set heading 0
- set shape "person"
+ set shape "person rotate"
  set color red
  set size 1.7
  setxy (world-width / 2) (world-height / 2)
@@ -116,7 +125,8 @@ if roving.diver? = true [                                          ;roving diver
  set color green
  set size 1.7
  setxy (world-width / 2) (world-height / 2)
- if show.paths? = true [pen-down]                                                          ;this shows the path of the diver
+ if show.paths? = true [pen-down]                                                           ;this shows the path of the diver
+ set speed roving.diver.mean.speed
  set counted.sharks [] ; sets counted.sharks as an empty list
 ]
 ]
@@ -144,7 +154,7 @@ ifelse diver.memory? = true [                                   ;enable or disab
       set memory false 
     ]
     ]
-reset-ticks   
+reset-ticks
 if show.diver.detail.windows? = true [
   if any? transdivers [inspect one-of transdivers]         ;here I had to use "if any?" because inspect will return an error if it finds nobody
   if any? statdivers [inspect one-of statdivers]
@@ -157,7 +167,13 @@ to go
   tick
   if ticks > survey.time [
     do.outputs
-    stop]
+    stop]                                   ; end the simulation run when survey.time is reached
+  if stationary.radius > visibility.length [
+   output-print "ERROR: stationary.radius is set to a value greater than visibility.length"              ; if the stationary radius is higher than visibility, stop and output an error description
+   output-print "The diver will not commit to sampling an area that it will not be able to see"
+   output-print "Stopping simulation"
+   stop 
+  ]
   ask transdivers [
    do.tdiver.movement 
   ]
@@ -217,6 +233,24 @@ to do.outputs
  ]
 end
 
+to calculate.bias
+ifelse choose.method = "transect" [
+ifelse any? transdivers [
+output-print "The real value using the transect method is"
+output-print precision (observed.value / transect.factor.value) 3]
+[output-print "You need to re-run the model with this method enabled"
+  stop
+]
+] [
+ifelse any? statdivers [
+output-print "The real value using the stationary method is"
+output-print precision (observed.value / stationary.factor.value) 3
+] [
+output-print "You need to re-run the model with this method enabled"
+stop
+]]
+end
+
 
 
 ;SHARK PROCEDURES
@@ -226,10 +260,6 @@ end
 
 to do.shark.movement
   set heading heading + random-float-between (- shark.dir.angle) shark.dir.angle
-  let speed.sim random-beta shark.spread.speed shark.spread.speed
-  let a shark.mean.speed - shark.range.speed
-  let b shark.mean.speed + shark.range.speed
-  set speed a + speed.sim * (b - a)
   fd speed ; each step is a second, so the speed is basically the distance
 end
 
@@ -242,11 +272,6 @@ end
 ;Transect diver procedures
 
 to do.tdiver.movement
-  let speed.sim random-beta transect.diver.spread.speed transect.diver.spread.speed
-  let a transect.diver.mean.speed - transect.diver.range.speed
-  let b transect.diver.mean.speed + transect.diver.range.speed
-  set speed a + speed.sim * (b - a)
-  ;set label speed  ; just for troubleshooting
   fd speed ; each step is a second, so the speed is basically the distance
 end
 
@@ -266,7 +291,6 @@ to t.count.sharks
   if any? new.sharks [
     let new.records ([species] of new.sharks)
     set counted.sharks sentence counted.sharks new.records
-    ; ask new.sharks [set color red wait 1 set color gray]   ;for troubleshooting
     set memory sentence memory [who] of new.sharks
   ]]
     
@@ -293,7 +317,6 @@ to s.count.sharks
   if any? new.sharks [
     let new.records ([species] of new.sharks)
     set counted.sharks sentence counted.sharks new.records
-    ; ask new.sharks [set color red wait 1 set color gray]   ;for troubleshooting
     set memory sentence memory [who] of new.sharks
   ]]
 end
@@ -302,11 +325,6 @@ end
 
 to do.rdiver.movement
   if ticks mod 2 = 0 [set heading heading + random-float-between (- roving.diver.turning.angle) roving.diver.turning.angle]         ;turning happens every 2 seconds
-  let speed.sim random-beta roving.diver.spread.speed roving.diver.spread.speed
-  let a roving.diver.mean.speed - roving.diver.range.speed
-  let b roving.diver.mean.speed + roving.diver.range.speed
-  set speed a + speed.sim * (b - a)
-  ;set label speed  ; just for troubleshooting
   fd speed ; each step is a second, so the speed is basically the distance
 end
 
@@ -330,12 +348,6 @@ to r.count.sharks
 
 ;reporters
 
-to-report random-beta [a b]    ;this generates a random number from a Beta distribution, given shape parameters a and b.
-   let x1 random-gamma a 1
-   let x2 random-gamma b 1
-   report ( x1 / ( x1 + x2) )
-end
-
 to-report random-float-between [a b]
   report random-float (b - a + 1) + a
 end
@@ -346,6 +358,14 @@ end
 
 to-report s.bias-result
   report [s.bias] of one-of statdivers
+end
+
+to-report stationary.factor.value
+  report s.bias-result + 1
+end
+
+to-report transect.factor.value
+  report t.bias-result + 1
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -393,11 +413,11 @@ NIL
 1
 
 BUTTON
-969
+967
 68
-1061
+1030
 101
-Go / Pause
+Go
 go
 T
 1
@@ -410,9 +430,9 @@ NIL
 1
 
 BUTTON
-1066
+1035
 68
-1143
+1112
 101
 Go once
 go
@@ -452,60 +472,6 @@ transect.diver.speed
 m/min
 HORIZONTAL
 
-INPUTBOX
-26
-79
-174
-139
-t.range.speed
-0
-1
-0
-Number
-
-INPUTBOX
-26
-142
-174
-202
-transect.diver.spread.speed
-5
-1
-0
-Number
-
-CHOOSER
-264
-283
-402
-328
-shark.mean.speed
-shark.mean.speed
-0 0.0010 0.01 0.1 0.2 0.4 0.6 0.8 1 2 4
-10
-
-INPUTBOX
-263
-397
-418
-457
-shark.range.speed
-0
-1
-0
-Number
-
-INPUTBOX
-263
-332
-418
-392
-shark.spread.speed
-0.1
-1
-0
-Number
-
 TEXTBOX
 29
 21
@@ -517,20 +483,20 @@ Transect diver movement
 1
 
 TEXTBOX
-29
-268
-179
-286
+27
+140
+177
+158
 Stationary diver movement
 11
 0.0
 1
 
 SLIDER
-26
-296
-249
-329
+24
+168
+247
+201
 stationary.turning.angle
 stationary.turning.angle
 0
@@ -542,10 +508,10 @@ degrees / sec
 HORIZONTAL
 
 TEXTBOX
-266
-267
-416
-285
+262
+139
+412
+157
 Shark movement
 11
 0.0
@@ -553,9 +519,9 @@ Shark movement
 
 CHOOSER
 26
-210
+80
 118
-255
+125
 transect.width
 transect.width
 1 2 4 5 8 10 20
@@ -577,14 +543,14 @@ m
 HORIZONTAL
 
 SLIDER
-25
-335
-197
-368
+23
+207
+195
+240
 stationary.radius
 stationary.radius
 1
-15
+20
 7.5
 0.5
 1
@@ -611,25 +577,15 @@ TEXTBOX
 282
 1174
 304
-time step at which counts are made by the divers
+Time step at which counts are made by the divers
 9
 0.0
 1
 
-CHOOSER
-264
-466
-402
-511
-shark.dir.angle
-shark.dir.angle
-1 22.5 45
-2
-
 SLIDER
 901
 311
-1187
+1055
 344
 survey.time
 survey.time
@@ -642,10 +598,10 @@ seconds
 HORIZONTAL
 
 TEXTBOX
-410
-306
-439
-324
+369
+193
+398
+211
 m/s
 11
 0.0
@@ -657,7 +613,7 @@ INPUTBOX
 977
 169
 shark.density
-0.01
+0.2
 1
 0
 Number
@@ -668,7 +624,7 @@ INPUTBOX
 978
 232
 numb.sharks
-1600
+32000
 1
 0
 Number
@@ -694,20 +650,10 @@ sharks / m2
 1
 
 TEXTBOX
-180
-111
-221
-129
-m/min
-11
-0.0
-1
-
-TEXTBOX
 127
-234
+104
 153
-253
+123
 m
 11
 0.0
@@ -715,9 +661,9 @@ m
 
 SWITCH
 902
-349
+350
 1040
-382
+383
 diver.memory?
 diver.memory?
 0
@@ -725,9 +671,9 @@ diver.memory?
 -1000
 
 OUTPUT
-482
+479
 457
-889
+890
 544
 12
 
@@ -746,27 +692,6 @@ roving.diver.speed
 m/min
 HORIZONTAL
 
-INPUTBOX
-262
-80
-417
-140
-r.range.speed
-0
-1
-0
-Number
-
-TEXTBOX
-424
-113
-481
-131
-m/min
-11
-0.0
-1
-
 TEXTBOX
 263
 21
@@ -777,22 +702,11 @@ Roving diver movement
 0.0
 1
 
-INPUTBOX
-262
-142
-417
-202
-roving.diver.spread.speed
-5
-1
-0
-Number
-
 SLIDER
-262
-209
-470
-242
+261
+82
+469
+115
 roving.diver.turning.angle
 roving.diver.turning.angle
 0
@@ -804,32 +718,32 @@ roving.diver.turning.angle
 HORIZONTAL
 
 SWITCH
+24
+287
+165
+320
+transect.diver?
+transect.diver?
+0
+1
+-1000
+
+SWITCH
 25
-401
-166
-434
-transect.diver?
-transect.diver?
+325
+165
+358
+stationary.diver?
+stationary.diver?
 0
 1
 -1000
 
 SWITCH
 26
-439
-166
-472
-stationary.diver?
-stationary.diver?
-0
-1
--1000
-
-SWITCH
-27
-476
-166
-509
+362
+165
+395
 roving.diver?
 roving.diver?
 1
@@ -837,20 +751,20 @@ roving.diver?
 -1000
 
 TEXTBOX
-28
-382
-178
-400
+24
+264
+174
+282
 Select active divers
 11
 0.0
 1
 
 SWITCH
-1116
-408
-1242
-441
+1098
+404
+1224
+437
 show.paths?
 show.paths?
 0
@@ -859,9 +773,9 @@ show.paths?
 
 SWITCH
 903
-408
-1112
-441
+404
+1089
+437
 show.diver.detail.windows?
 show.diver.detail.windows?
 0
@@ -869,51 +783,342 @@ show.diver.detail.windows?
 -1000
 
 TEXTBOX
-904
+905
 389
-1054
+1055
 407
 Display options
 11
 0.0
 1
 
+TEXTBOX
+172
+368
+322
+396
+This diver does not estimate densities
+11
+0.0
+1
+
+TEXTBOX
+1045
+355
+1195
+383
+Ability to remember counted sharks (usually on)
+11
+0.0
+1
+
+BUTTON
+1001
+28
+1128
+61
+Reset to defaults
+set transect.diver.speed 4\nset transect.width 4\nset stationary.turning.angle 4\nset stationary.radius 7.5\nset transect.diver? true\nset stationary.diver? true\nset roving.diver? false\nset roving.diver.speed 4\nset roving.diver.turning.angle 4\nset shark.mean.speed 1\nset shark.dir.angle 45\nset shark.density 0.2\nset visibility.length 13\nset time.step 2\nset survey.time 300\nset diver.memory? true\nset show.diver.detail.windows? false\nset show.paths? true\n
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+TEXTBOX
+202
+224
+231
+242
+m
+11
+0.0
+1
+
+TEXTBOX
+367
+257
+422
+275
+degrees
+11
+0.0
+1
+
+MONITOR
+480
+581
+612
+626
+Transect factor value
+transect.factor.value
+2
+1
+11
+
+MONITOR
+481
+631
+612
+676
+Stationary factor value
+stationary.factor.value
+2
+1
+11
+
+TEXTBOX
+482
+549
+850
+587
+Bias correction calculator (use after model run)
+15
+0.0
+1
+
+BUTTON
+629
+684
+748
+724
+CALCULATE
+calculate.bias
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+INPUTBOX
+639
+614
+735
+674
+observed.value
+100
+1
+0
+Number
+
+TEXTBOX
+623
+577
+773
+605
+Input the real count / density from the field survey:
+11
+0.0
+1
+
+CHOOSER
+755
+621
+893
+666
+choose.method
+choose.method
+"transect" "stationary"
+0
+
+BUTTON
+399
+458
+476
+543
+Clear output
+clear-output
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+INPUTBOX
+259
+156
+361
+216
+shark.mean.speed
+1
+1
+0
+Number
+
+INPUTBOX
+260
+219
+362
+279
+shark.dir.angle
+45
+1
+0
+Number
+
 @#$#@#$#@
 ## WHAT IS IT?
 
-Version with random movement drawn from a beta distribution
+This is a model that simulates divers counting sharks while deploying the belt-transect, stationary-point-count and roving underwater visual census techniques. The model demonstrates how non-instantaneous sampling techniques produce bias by overestimating the number of counted animals, when they move relative to the person counting them.
+
+This is applied to divers and sharks, but is intended to reflect what happens with many other animal censuses (aerial surveys, bird transects, etc.).
+
+The model can be used to demonstrate that bias increases as the speed of the animals relative to the observer increases.
+
+The model assumes an area that is featureless and flat, with a default size of 400x400 cells with an area of 1 square meter. The origin of the coordinate system is on the bottom left corner and depth is ignored (assumed constant).
 
 ## HOW IT WORKS
 
-(what rules the agents use to create the overall behavior of the model)
+For each simulation, the divers start in the middle and face north. Sharks and transect divers move every second, but the time step for counting can be set to 2 seconds for better computing performance (set by default on the original model).
+
+At each counting time step, divers count the number of sharks they can see based on the direction the diver is facing, the visibility distance and angle.
+
+On the belt-transect method, only fish within the transect width are counted, while on the stationary-point-count method, only fish within a pre-determined radius are counted.
+
+Transect diver moves in a fixed direction at a constant speed (default is 4 m/s).
+
+Stationary diver rotates a given number of degrees clockwise every two seconds (default is 4).
+
+Sharks move at a speed specified by the user, and travel in a direction that is restricted by a turning angle based on the previous direction.
+
+Sharks and divers that reach the boundaries of the area wrap around to the opposite side, to keep the density constant (on the original model they can leave the area, but that doesn't seem to have significant effects on the output, if the area is large enough.
+
+By default, divers keep a memory of every individual shark counted and do not recount.
 
 ## HOW TO USE IT
 
-(how to use the model, including a description of each of the items in the Interface tab)
+In order to speed up model runs, please disable update view.
+
+The "setup" button feeds all parameter values into the model, places the selected divers and spreads all the sharks across the area.
+
+The "go" button runs the model for the time specified in survey.time (default is 300 seconds) and then stops. The model can be stopped or paused at any time by pressing the go button while it is running. The "go once" button avances the model run by 1 second each time.
+
+The "reset to defaults" sets all parameters to values used in the first experiment by Ward-Paige et al. (2010) with shark speed set to 1 m/s. You still need to press "setup" after reseting model parameters to defaults.
+
+Viewing angles are fixed and cannot be changed on the interface. They are set to 160º for the stationary and roving divers and 180º for the transect diver.
+
+"transect.width" sets the width of the belt transect that is sampled as the diver swims in the center (transect.width/2 to each side of the diver).
+
+To set the initial number of sharks, introduce the total number of sharks directly under "numb.sharks" on the interface. Alternatively (and preferably), you can set the real density needed under "shark.density" and the model will place the right number of sharks for the total area. If shark.density is set to a value greater than 0 when the model starts, it has priority over "numb.sharks".
+
+Select the divers that will be in the model by turning their swiches on and off on the interface. Please note that the roving diver will not calculate densities and thus will not estimate bias. If you want to see the details of every diver in a floating window during the run, switch on "show.diver.detail.windows?".
+
+If you want the transect and roving divers to draw a path as they move, switch on "show.paths?".
+
+Stationary.radius must be set to a value lower than visibility.length.
+
+In the end of each run, each diver reports its relative bias, calculated as:
+
+(real count - expected count) / expected count
+
+where "expected count" is basically the real shark.density multiplied by the sampled area.
+
+For the stationary diver:
+
+sampled area = pi * stationary.radius^2
+
+For the transect diver:
+
+sampled area = survey.time * (transect.diver.speed / 60) * transect.width + visibility length * transect.width
+
+Notice that the final part of the transect is approximated to a rectangle of length equal to the visibility length, instead of taking into account the arc produced by the cone of vision. This was done in the original model and, With relatively large visibility lengths, does not seem to have much impact on the final result.
+
+The model will also output the conversion factor value for each method (transect and stationary). The real count (in the field) divided by this factor value should provide an estimate that is corrected to account for bias (given that all parameters are realistically set).
 
 ## THINGS TO NOTICE
 
-(suggested things for the user to notice while running the model)
+If "view updates" is enabled, the model will run in real time (every second in the model will run in one second).
+
+To understand the source of the bias, compare a model wun with shark.mean.speed set to 0 m/s (stationary sharks) and another with shark.mean.speed set to 1 m/s. Keep everything else default.
+
+In the first case (stationary sharks), the sampling method will be equivalent to taking a snapshot of the whole sampling area. The sharks will stand still and the diver will count every shark in the sampling area, not repeating any shark (given that "diver.memory?" is switched on). This will produce little to no bias in the estimates.
+
+In the case where sharks move 1 meter every second (while the diver is moving 4 meters every minute), there will be new sharks comming into the sampling area that were not there in the beginning. These sharks will all be counted as they pass in front of the diver, increasing the number of counted sharks, while the real number of sharks in the beginning was much lower. This produces the bias.
+
+If the speed of the sharks is even higher, there are more sharks coming into the field of view of the diver and the bias will be even higher.
 
 ## THINGS TO TRY
 
-(suggested things for the user to try to do (move sliders, switches, etc.) with the model)
+- The model can be used as a tool to get better estimates from field surveys.
+
+To make corrections to observed values (values observed in the field by non-instantaneous surveys):
+
+1. Decide on Targeted fish and select an appropriate speed and turning angle for that species for a given dive.
+2. Select most appropriate sampling values (e.g. transect width, swim speed, survey time, etc.) Note: for visibility, select the distance you would be sure to detect the targeted fish.
+4. Divide your observed count, density, or biomass by the factor value to get the corrected value. 
+5. Repeat for other species.
+
+- Switch on just the transect diver and see how increasing shark speeds increases bias. Why does this happen?
+
+- Do the same for the stationary diver. Were the results expected?
+
+- With stationary sharks (speed 0) and moving divers, bias is almost zero, but what about stationary divers with moving sharks? Place a stationary diver with stationary.turning.angle set to 0 and sharks with speed > 0 and see the results.
+
+- There are two experiments in behaviorSpace that correspond to the experiments run by Ward-Paige et al. (2010). One to observe the increase in bias with increasing shark speed (30 replicates per run) and one to test every combination of values from a set of realistic candidates (a single run per combination) and observe the resulting bias.
 
 ## EXTENDING THE MODEL
 
-(suggested things to add or change in the Code tab to make the model more complicated, detailed, accurate, etc.)
+Since divers are counting species, more species can be introduced, with different densities and parameter values (by creating new breeds).
+
+Fixed distance transects can be implemented, or other survey methods.
+
+Different animal behavior models can be coupled to this model to generate better bias estimates.
 
 ## NETLOGO FEATURES
 
-(interesting or unusual features of NetLogo that the model uses, particularly in the Code tab; or where workarounds were needed for missing features)
+On the original model, the sharks could leave the area and come back (or leave permanently). Here the world is set to wrap around the edges. For an area that is large enough, this does not seem to affect the final results. In order to reflect what was made in the original model in R, one can set a buffer area around where no sharks are placed. If for some reason we want sharks to leave and never come back, we can just make them die when they reach the edges.
 
 ## RELATED MODELS
 
-(models in the NetLogo Models Library and elsewhere which are of related interest)
+The orignial AnimDens model was implemented in R by Christine Ward-Paige, Joanna Mills Flemming and Heike K. Lotze. The code can be downloaded at:
+
+http://journals.plos.org/plosone/article/asset?unique&id=info:doi/10.1371/journal.pone.0011722.s001
 
 ## CREDITS AND REFERENCES
 
-(a reference to the model's URL on the web if it has one, as well as any other necessary credits, citations, and links)
+Original model by Christine Ward-Paige (2009)
+
+Implemented in NetLogo by Miguel Pessanha Pais (2015)
+
+If you use this model, please cite the original publication:
+
+Ward-Paige, C.A., Flemming, J.M., Lotze, H.K., 2010. Overestimating Fish Counts by Non-Instantaneous Visual Censuses: Consequences for Population and Community Descriptions. PLoS ONE 5(7): e11722. doi:10.1371/journal.pone.0011722
+
+URL: http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0011722
+
+Another publication that uses the roving diver:
+
+Ward-Paige, C.A., Lotze, H.K., 2011. Assessing the Value of Recreational Divers for Censusing Elasmobranchs. PLoS ONE 6(10): e25609. doi:10.1371/journal.pone.0025609
+
+URL: http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0025609
+
+In order to cite the NetLogo implementation:
+
+Pais, M.P., Ward-Paige, C.A. (2015). AnimDens model NetLogo implementation. http://modelingcommons.org/model/
+
+NetLogo software citation:
+
+Wilensky, U. (1999). NetLogo. http://ccl.northwestern.edu/netlogo/. Center for Connected Learning and Computer-Based Modeling, Northwestern Institute on Complex Systems, Northwestern University, Evanston, IL.
+
+## COPYRIGHT AND LICENSE
+
+Copyright 2015 Miguel Pessanha Pais and Christine Ward-Paige.
+
+![CC BY-NC-SA 3.0](http://ccl.northwestern.edu/images/creativecommons/byncsa.png)
+
+This work is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 3.0 License.  To view a copy of this license, visit http://creativecommons.org/licenses/by-nc-sa/3.0/ or send a letter to Creative Commons, 559 Nathan Abbott Way, Stanford, California 94305, USA.
 @#$#@#$#@
 default
 true
@@ -1088,6 +1293,15 @@ Polygon -7500403 true true 150 15 15 120 60 285 240 285 285 120
 
 person
 false
+0
+Circle -7500403 true true 110 5 80
+Polygon -7500403 true true 105 90 120 195 90 285 105 300 135 300 150 225 165 300 195 300 210 285 180 195 195 90
+Rectangle -7500403 true true 127 79 172 94
+Polygon -7500403 true true 195 90 240 150 225 180 165 105
+Polygon -7500403 true true 105 90 60 150 75 180 135 105
+
+person rotate
+true
 0
 Circle -7500403 true true 110 5 80
 Polygon -7500403 true true 105 90 120 195 90 285 105 300 135 300 150 225 165 300 195 300 210 285 180 195 195 90
