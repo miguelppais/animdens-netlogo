@@ -1,17 +1,8 @@
-;Simulation model: AnimDens
-;Original model implemented in R by Christine Ward-Paige
+;AnimDens Model
+;Original model implemented in R by Christine Ward-Paige et al.
 ;Adapted and implemented in NetLogo by Miguel Pessanha Pais
 
 ;FOR MORE INFORMATION, LOOK IN THE INFO TAB
-
-;This is a model that simulates surveyors counting animals while deploying the belt-transect and stationary-
-;point-count techniques. The model assumes an area that is featureless and flat. For each simulation, the surveyors
-;start in the middle and face in the same direction. At each time step (which is set by the user) surveyors count
-;the number of animals they can see based on the direction the surveyor is facing, the visibility distance (set by the user)
-;and the angle of which the surveyor can see at a given time step (set by the user). The animals move at a speed specified by the user,
-;and travel in a direction that is restricted (selected angle is set by the user) based on the previous direction.
-;Anmals that reach the boundaries of the area wrap around to the opposite side (in the original model they could leave the area).
-;Surveyors remember every animal they counted and do not recount.
 
 
 ;Global variables not represented in the main screen
@@ -72,9 +63,9 @@ to setup
   stop-inspecting-dead-agents                           ; clears surveyor detail windows from previous simulation runs
   resize-world 0 (area.width - 1) 0 (area.length - 1)
   set-patch-size (100 / area.length) * 10
-  ask patches with [pycor mod 2 = 0 and pxcor mod 2 = 0] [set pcolor 2]   ; create background grid
-  ask patches with [pycor mod 2 = 1 and pxcor mod 2 = 1] [set pcolor 2]
-  ask patches with [pcolor = black] [set pcolor 1]
+  ask patches with [pycor mod 2 = 0 and pxcor mod 2 = 0] [set pcolor environment.color]   ; create background grid
+  ask patches with [pycor mod 2 = 1 and pxcor mod 2 = 1] [set pcolor environment.color]
+  ask patches with [pcolor = black] [set pcolor environment.color + 1]
   set actual.area world-height * world-width
   set trans.viewangle 180
   set stat.viewangle 160
@@ -344,8 +335,8 @@ end
 GRAPHICS-WINDOW
 580
 30
-1581
-1032
+1588
+1039
 -1
 -1
 10.0
@@ -421,9 +412,9 @@ NIL
 
 MONITOR
 250
-185
-385
-230
+200
+380
+245
 Total area (sq. meters)
 actual.area
 0
@@ -482,9 +473,9 @@ HORIZONTAL
 
 TEXTBOX
 255
-360
+420
 405
-378
+438
 Animal movement
 11
 0.0
@@ -547,9 +538,9 @@ HORIZONTAL
 
 INPUTBOX
 335
-295
-413
 355
+413
+415
 animal.density
 0.1
 1
@@ -558,9 +549,9 @@ Number
 
 INPUTBOX
 250
-295
-329
 355
+329
+415
 numb.animals
 1000.0
 1
@@ -569,9 +560,9 @@ Number
 
 TEXTBOX
 420
-300
+360
 554
-334
+394
 If this is >0, it has priority over numb.animals
 11
 15.0
@@ -579,9 +570,9 @@ If this is >0, it has priority over numb.animals
 
 TEXTBOX
 420
-330
+390
 570
-348
+408
 animals / m2
 11
 0.0
@@ -599,9 +590,9 @@ m
 
 OUTPUT
 255
-755
+815
 555
-845
+905
 11
 
 SLIDER
@@ -725,7 +716,7 @@ BUTTON
 565
 180
 Set default parameter values
-set transect.speed 4\nset transect.width 4\nset stationary.turning.angle 4\nset stationary.radius 7.5\nset transect? true\nset stationary? true\nset roving? false\nset roving.speed 4\nset roving.turning.angle 4\nset animal.mean.speed 1\nset animal.dir.angle 45\nset animal.density 0.1\nset visibility.length 13\nset survey.time 300\nset count.time.step 2\nset show.surveyor.detail.windows? false\nset show.paths? true\nset animal.shape \"fish\"\nset animal.color 9\nset surveyor.shape \"person\"
+set transect.speed 4\nset transect.width 4\nset stationary.turning.angle 4\nset stationary.radius 7.5\nset transect? true\nset stationary? true\nset roving? false\nset roving.speed 4\nset roving.turning.angle 4\nset animal.mean.speed 1\nset animal.dir.angle 45\nset animal.density 0.1\nset visibility.length 13\nset survey.time 300\nset count.time.step 2\nset show.surveyor.detail.windows? false\nset show.paths? true\nset animal.shape \"fish\"\nset animal.color 9\nset environment.color 102\nset surveyor.shape \"person\"
 NIL
 1
 T
@@ -738,9 +729,9 @@ NIL
 
 MONITOR
 410
-595
+655
 550
-640
+700
 Transect factor value
 transect.factor.value
 2
@@ -749,9 +740,9 @@ transect.factor.value
 
 MONITOR
 410
-640
+700
 550
-685
+745
 Stationary factor value
 stationary.factor.value
 2
@@ -760,9 +751,9 @@ stationary.factor.value
 
 TEXTBOX
 255
-460
+520
 450
-496
+556
 BIAS CORRECTION CALCULATOR (use after model run)
 13
 0.0
@@ -770,9 +761,9 @@ BIAS CORRECTION CALCULATOR (use after model run)
 
 BUTTON
 255
-690
+750
 550
-726
+786
 4. CALCULATE
 calculate.bias
 NIL
@@ -787,9 +778,9 @@ NIL
 
 INPUTBOX
 410
-490
 550
 550
+610
 observed.value
 10.0
 1
@@ -798,9 +789,9 @@ Number
 
 TEXTBOX
 260
-505
+565
 410
-533
+593
 1. Input the real count / density from the field survey:
 11
 15.0
@@ -808,9 +799,9 @@ TEXTBOX
 
 CHOOSER
 410
+610
 550
-550
-595
+655
 choose.method
 choose.method
 "transect" "stationary"
@@ -818,9 +809,9 @@ choose.method
 
 BUTTON
 255
-845
+905
 555
-885
+945
 Clear output
 clear-output
 NIL
@@ -958,9 +949,9 @@ SAMPLING PARAMETERS___________
 
 TEXTBOX
 255
-270
+330
 575
-296
+356
 ANIMAL POPULATION PARAMETERS_____________________
 11
 0.0
@@ -968,9 +959,9 @@ ANIMAL POPULATION PARAMETERS_____________________
 
 TEXTBOX
 260
-550
+610
 410
-591
+651
 2. Choose a sampling method (activate it in the model run as well)
 11
 15.0
@@ -978,9 +969,9 @@ TEXTBOX
 
 TEXTBOX
 260
-615
+675
 410
-656
+716
 3. Run the model to calculate the factor value for the selected method.
 11
 15.0
@@ -988,9 +979,9 @@ TEXTBOX
 
 TEXTBOX
 295
-730
+790
 555
-748
+808
 Results appear in the output box below.
 13
 15.0
@@ -1059,9 +1050,9 @@ HORIZONTAL
 
 SLIDER
 250
-380
+440
 460
-413
+473
 animal.mean.speed
 animal.mean.speed
 0
@@ -1074,9 +1065,9 @@ HORIZONTAL
 
 SLIDER
 250
-415
+475
 460
-448
+508
 animal.dir.angle
 animal.dir.angle
 0
@@ -1089,13 +1080,24 @@ HORIZONTAL
 
 TEXTBOX
 470
-405
+465
 560
-455
+515
 animal turns between minus and plus this angle
 11
 15.0
 1
+
+INPUTBOX
+250
+255
+565
+315
+environment.color
+102.0
+1
+0
+Color
 
 @#$#@#$#@
 ## WHAT IS IT?
