@@ -342,8 +342,8 @@ end
 GRAPHICS-WINDOW
 240
 10
-850
-641
+848
+619
 -1
 -1
 6.0
@@ -437,7 +437,7 @@ transect.diver.speed
 transect.diver.speed
 1
 10
-4
+4.0
 1
 1
 m/min
@@ -472,7 +472,7 @@ stationary.turning.angle
 stationary.turning.angle
 0
 90
-4
+4.0
 1
 1
 degrees / sec
@@ -507,7 +507,7 @@ visibility.length
 visibility.length
 5
 40
-13
+13.0
 1
 1
 m
@@ -537,7 +537,7 @@ survey.time
 survey.time
 60
 3600
-300
+300.0
 10
 1
 seconds
@@ -570,7 +570,7 @@ INPUTBOX
 934
 305
 numb.sharks
-2000
+2000.0
 1
 0
 Number
@@ -621,7 +621,7 @@ roving.diver.speed
 roving.diver.speed
 1
 7
-4
+4.0
 1
 1
 m/min
@@ -646,7 +646,7 @@ roving.diver.turning.angle
 roving.diver.turning.angle
 0
 45
-4
+4.0
 1
 1
 º / 2 secs
@@ -733,7 +733,7 @@ BUTTON
 1155
 160
 Setup with default parameter values
-set transect.diver.speed 4\nset transect.width 4\nset stationary.turning.angle 4\nset stationary.radius 7.5\nset transect.diver? true\nset stationary.diver? true\nset roving.diver? false\nset roving.diver.speed 4\nset roving.diver.turning.angle 4\nset shark.mean.speed 1\nset shark.dir.angle 45\nset shark.density 0.2\nset visibility.length 13\nset survey.time 300\nset count.time.step 2\nset show.diver.detail.windows? false\nset show.paths? true\nrun [setup]\n
+set transect.diver.speed 4\nset transect.width 4\nset stationary.turning.angle 4\nset stationary.radius 7.5\nset transect.diver? true\nset stationary.diver? true\nset roving.diver? false\nset roving.diver.speed 4\nset roving.diver.turning.angle 4\nset shark.mean.speed 1\nset shark.dir.angle 45\nset shark.density 0.2\nset visibility.length 13\nset survey.time 300\nset count.time.step 2\nset show.diver.detail.windows? false\nset show.paths? true\nrun [setup]
 NIL
 1
 T
@@ -809,7 +809,7 @@ INPUTBOX
 1155
 515
 observed.value
-10
+10.0
 1
 0
 Number
@@ -857,7 +857,7 @@ INPUTBOX
 955
 385
 shark.mean.speed
-1
+1.0
 1
 0
 Number
@@ -868,7 +868,7 @@ INPUTBOX
 1060
 385
 shark.dir.angle
-45
+45.0
 1
 0
 Number
@@ -970,7 +970,7 @@ count.time.step
 count.time.step
 1
 2
-2
+2.0
 1
 1
 seconds
@@ -1039,7 +1039,7 @@ TEXTBOX
 @#$#@#$#@
 ## WHAT IS IT?
 
-AnimDens NetLogo 1.1
+AnimDens NetLogo 2.0
 
 This is a model that simulates divers counting sharks while deploying belt-transect, stationary-point-count and roving underwater visual census techniques. The model demonstrates how non-instantaneous sampling techniques produce bias by overestimating the number of counted animals, when they move relative to the person counting them.
 
@@ -1197,6 +1197,9 @@ Copyright 2015 Miguel Pessanha Pais and Christine Ward-Paige.
 This work is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 3.0 License.  To view a copy of this license, visit http://creativecommons.org/licenses/by-nc-sa/3.0/ or send a letter to Creative Commons, 559 Nathan Abbott Way, Stanford, California 94305, USA.
 
 ## CHANGELOG
+
+2.0
+Code updated to work with NetLogo 6.0. Doesn't work with previous versions now.
 
 1.1
 World size decreased to 100x100 by default.
@@ -1589,9 +1592,8 @@ false
 0
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
-
 @#$#@#$#@
-NetLogo 5.2.1
+NetLogo 6.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
@@ -1612,7 +1614,7 @@ NetLogo 5.2.1
     </enumeratedValueSet>
     <enumeratedValueSet variable="shark.mean.speed">
       <value value="0"/>
-      <value value="0.0010"/>
+      <value value="0.001"/>
       <value value="0.01"/>
       <value value="0.1"/>
       <value value="0.2"/>
@@ -1667,7 +1669,7 @@ NetLogo 5.2.1
     </enumeratedValueSet>
     <enumeratedValueSet variable="shark.mean.speed">
       <value value="0"/>
-      <value value="0.0010"/>
+      <value value="0.001"/>
       <value value="0.01"/>
       <value value="0.1"/>
       <value value="0.2"/>
@@ -1752,7 +1754,7 @@ NetLogo 5.2.1
     </enumeratedValueSet>
     <enumeratedValueSet variable="shark.mean.speed">
       <value value="0"/>
-      <value value="0.0010"/>
+      <value value="0.001"/>
       <value value="0.01"/>
       <value value="0.1"/>
       <value value="0.2"/>
@@ -1810,7 +1812,6 @@ true
 0
 Line -7500403 true 150 150 90 180
 Line -7500403 true 150 150 210 180
-
 @#$#@#$#@
 1
 @#$#@#$#@
