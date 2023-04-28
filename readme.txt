@@ -1,6 +1,6 @@
 ## WHAT IS IT?
 
-AnimDens NetLogo 2.0
+AnimDens NetLogo 3.0
 
 This is a model that simulates surveyors counting aninmals while deploying belt-transect, stationary-point-count and roving (random path) techniques. The model demonstrates how non-instantaneous sampling techniques produce bias by overestimating the number of counted animals, when they move relative to the surveyor.
 
