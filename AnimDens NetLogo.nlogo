@@ -10,7 +10,6 @@
 globals[
   actual.area
   trans.viewangle
-  stat.viewangle
   rov.viewangle
   transect.mean.speed
   roving.mean.speed
@@ -68,7 +67,6 @@ to setup
   ask patches with [pcolor = black] [set pcolor environment.color + 1]
   set actual.area world-height * world-width
   set trans.viewangle 180
-  set stat.viewangle 160
   set rov.viewangle 160
   set transect.mean.speed (transect.speed / 60)  ; these 4 lines just convert interface speeds (in m/min) to m/s
   set roving.mean.speed (roving.speed / 60)
@@ -76,7 +74,13 @@ to setup
   ; on the original model, the final part of the sampled area of the transect is assumed to be a rectangle (transect.width x visibility.length)
 
   set transect.area transect.width * (transect.mean.speed * survey.time) + transect.width * visibility.length
-  set stationary.area pi * stationary.radius ^ 2
+
+  ; calculation of stationary area is trickier because it must take into account how much the diver will rotate, up to the maximum of 360 degrees, even if it exceeds in practice
+
+  ifelse (stat.viewangle + (stationary.turning.angle * survey.time)) > 360 [
+    set stationary.area pi * (stationary.radius ^ 2)] [
+    set stationary.area ((stat.viewangle + (stationary.turning.angle * survey.time)) / 360) * pi * (stationary.radius ^ 2)
+  ]
 
 ; if animal density is set to some number, then use that to calculate the number of animals to deploy. Otherwise, just use the numb.animals.
 
@@ -95,7 +99,7 @@ if transect? [                                         ;transect surveyor setup
   create-transsurveyors 1 [
  set heading 0
  set shape surveyor.shape
- set color blue
+ set color cyan
  set size 2
  setxy (world-width / 2) (world-height / 2)
  if show.paths? [pen-down]                                                           ;this shows the path of the surveyor
@@ -201,14 +205,18 @@ to do.outputs
     let real.count length counted.animals
     let expected.count animal.density * transect.area
     set t.bias (real.count - expected.count) / expected.count
-    output-type "Transect surveyor bias was " output-print precision t.bias 2           ; outputs bias with 2 decimal places
+    output-type "Transect relative bias: " output-print precision t.bias 2           ; outputs bias with 2 decimal places
+    output-type "Transect count: " output-print real.count
+    output-type "Transect density estimate " output-type precision (real.count / transect.area) 2 output-print " ind./m2"
   ]
 
  ask statsurveyors [
     let real.count length counted.animals
     let expected.count animal.density * stationary.area
     set s.bias (real.count - expected.count) / expected.count
-    output-type "Stationary surveyor bias was " output-print precision s.bias 2
+    output-type "Stationary relative bias: " output-print precision s.bias 2           ; outputs bias with 2 decimal places
+    output-type "Stationary count: " output-print real.count
+    output-type "Stationary density estimate " output-type precision (real.count / stationary.area) 2 output-print " ind./m2"
  ]
 
  ask rovsurveyors [
@@ -335,11 +343,11 @@ end
 GRAPHICS-WINDOW
 580
 30
-1588
+1213
 1039
 -1
 -1
-10.0
+12.5
 1
 10
 1
@@ -350,9 +358,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-99
+49
 0
-99
+79
 1
 1
 1
@@ -361,9 +369,9 @@ seconds
 
 BUTTON
 250
-30
+90
 355
-80
+140
 Setup
 setup
 NIL
@@ -378,9 +386,9 @@ NIL
 
 BUTTON
 250
-80
+140
 355
-130
+190
 Go
 go
 T
@@ -395,9 +403,9 @@ NIL
 
 BUTTON
 250
-130
+190
 355
-180
+240
 Go once
 go
 NIL
@@ -412,9 +420,9 @@ NIL
 
 MONITOR
 250
-200
+260
 380
-245
+305
 Total area (sq. meters)
 actual.area
 0
@@ -423,14 +431,14 @@ actual.area
 
 SLIDER
 10
-360
-235
-393
+400
+225
+433
 transect.speed
 transect.speed
 1
 10
-4.0
+6.0
 1
 1
 m/min
@@ -438,9 +446,9 @@ HORIZONTAL
 
 TEXTBOX
 10
-345
+385
 160
-363
+403
 Transect diver movement
 11
 0.0
@@ -448,24 +456,24 @@ Transect diver movement
 
 TEXTBOX
 10
-450
+555
 160
-468
-Stationary diver movement
+573
+Stationary movement
 11
 0.0
 1
 
 SLIDER
 10
-465
+570
 235
-498
+603
 stationary.turning.angle
 stationary.turning.angle
 0
 90
-4.0
+0.0
 1
 1
 degrees / sec
@@ -473,9 +481,9 @@ HORIZONTAL
 
 TEXTBOX
 255
-420
+480
 405
-438
+498
 Animal movement
 11
 0.0
@@ -483,9 +491,9 @@ Animal movement
 
 CHOOSER
 10
-395
-235
-440
+435
+102
+480
 transect.width
 transect.width
 1 2 4 5 8 10 20
@@ -493,9 +501,9 @@ transect.width
 
 SLIDER
 10
-200
+260
 235
-233
+293
 visibility.length
 visibility.length
 5
@@ -508,14 +516,14 @@ HORIZONTAL
 
 SLIDER
 10
-500
+605
 235
-533
+638
 stationary.radius
 stationary.radius
 1
 20
-7.5
+6.5
 0.5
 1
 m
@@ -523,24 +531,24 @@ HORIZONTAL
 
 SLIDER
 10
+295
 235
-235
-268
+328
 survey.time
 survey.time
 60
-3600
-300.0
-10
+1200
+200.0
+60
 1
 seconds
 HORIZONTAL
 
 INPUTBOX
 335
-355
-413
 415
+413
+475
 animal.density
 0.1
 1
@@ -549,20 +557,20 @@ Number
 
 INPUTBOX
 250
-355
-329
 415
+329
+475
 numb.animals
-1000.0
+400.0
 1
 0
 Number
 
 TEXTBOX
 420
-360
+420
 554
-394
+454
 If this is >0, it has priority over numb.animals
 11
 15.0
@@ -570,36 +578,26 @@ If this is >0, it has priority over numb.animals
 
 TEXTBOX
 420
-390
+450
 570
-408
+468
 animals / m2
 11
 0.0
 1
 
-TEXTBOX
-34
-418
-60
-437
-m
-11
-0.0
-1
-
 OUTPUT
-255
-815
-555
-905
+250
+645
+575
+740
 11
 
 SLIDER
 10
-555
+695
 235
-588
+728
 roving.speed
 roving.speed
 1
@@ -612,19 +610,19 @@ HORIZONTAL
 
 TEXTBOX
 10
-540
+680
 160
-558
-Roving diver movement
+698
+Roving movement
 11
 0.0
 1
 
 SLIDER
 10
-590
+730
 235
-623
+763
 roving.turning.angle
 roving.turning.angle
 0
@@ -637,9 +635,9 @@ HORIZONTAL
 
 SWITCH
 10
-30
+90
 165
-63
+123
 transect?
 transect?
 0
@@ -648,9 +646,9 @@ transect?
 
 SWITCH
 10
-65
+125
 165
-98
+158
 stationary?
 stationary?
 0
@@ -659,9 +657,9 @@ stationary?
 
 SWITCH
 10
-100
+160
 165
-133
+193
 roving?
 roving?
 1
@@ -670,9 +668,9 @@ roving?
 
 TEXTBOX
 10
-10
+70
 160
-28
+88
 Select active sampling methods
 11
 0.0
@@ -680,9 +678,9 @@ Select active sampling methods
 
 SWITCH
 10
-690
+820
 235
-723
+853
 show.paths?
 show.paths?
 0
@@ -691,9 +689,9 @@ show.paths?
 
 SWITCH
 10
-655
+785
 235
-688
+818
 show.surveyor.detail.windows?
 show.surveyor.detail.windows?
 1
@@ -702,9 +700,9 @@ show.surveyor.detail.windows?
 
 TEXTBOX
 15
-640
+770
 245
-666
+796
 DISPLAY OPTIONS_____________________
 11
 0.0
@@ -712,11 +710,11 @@ DISPLAY OPTIONS_____________________
 
 BUTTON
 365
-130
+190
 565
-180
+240
 Set default parameter values
-set transect.speed 4\nset transect.width 4\nset stationary.turning.angle 4\nset stationary.radius 7.5\nset transect? true\nset stationary? true\nset roving? false\nset roving.speed 4\nset roving.turning.angle 4\nset animal.mean.speed 1\nset animal.dir.angle 45\nset animal.density 0.1\nset visibility.length 13\nset survey.time 300\nset count.time.step 2\nset show.surveyor.detail.windows? false\nset show.paths? true\nset animal.shape \"fish\"\nset animal.color 9\nset environment.color 102\nset surveyor.shape \"person\"
+set transect.speed 6\nset transect.width 4\nset transect.length 20\nset area.width 50\nset area.length 80\nset stationary.turning.angle 2\nset stationary.radius 5\nset transect? true\nset stationary? false\nset roving? false\nset roving.speed 4\nset roving.turning.angle 4\nset animal.mean.speed 0.5\nset animal.dir.angle 45\nset animal.density 0.1\nset visibility.length 13\nset survey.time 200\nset count.time.step 2\nset show.surveyor.detail.windows? false\nset show.paths? true\nset animal.shape \"fish\"\nset animal.color 9\nset environment.color 102\nset surveyor.shape \"diver\"
 NIL
 1
 T
@@ -728,10 +726,10 @@ NIL
 1
 
 MONITOR
-410
-655
-550
-700
+415
+935
+555
+980
 Transect factor value
 transect.factor.value
 2
@@ -739,10 +737,10 @@ transect.factor.value
 11
 
 MONITOR
-410
-700
-550
-745
+415
+980
+555
+1025
 Stationary factor value
 stationary.factor.value
 2
@@ -750,20 +748,20 @@ stationary.factor.value
 11
 
 TEXTBOX
-255
-520
-450
-556
+260
+800
+455
+836
 BIAS CORRECTION CALCULATOR (use after model run)
 13
 0.0
 1
 
 BUTTON
-255
-750
-550
-786
+265
+981
+410
+1026
 4. CALCULATE
 calculate.bias
 NIL
@@ -777,41 +775,41 @@ NIL
 0
 
 INPUTBOX
-410
-550
-550
-610
+415
+830
+555
+890
 observed.value
-10.0
+50.0
 1
 0
 Number
 
 TEXTBOX
-260
-565
-410
-593
+265
+845
+415
+873
 1. Input the real count / density from the field survey:
 11
 15.0
 1
 
 CHOOSER
-410
-610
-550
-655
+415
+890
+555
+935
 choose.method
 choose.method
 "transect" "stationary"
 0
 
 BUTTON
-255
-905
-555
-945
+250
+745
+575
+785
 Clear output
 clear-output
 NIL
@@ -826,9 +824,9 @@ NIL
 
 BUTTON
 170
-30
+90
 236
-63
+123
 Follow
 if any? transsurveyors [follow one-of transsurveyors]
 NIL
@@ -843,9 +841,9 @@ NIL
 
 BUTTON
 170
-65
+125
 236
-98
+158
 Follow
 if any? statsurveyors [follow one-of statsurveyors]
 NIL
@@ -860,9 +858,9 @@ NIL
 
 BUTTON
 170
-100
+160
 236
-133
+193
 Follow
 if any? rovsurveyors [follow one-of rovsurveyors]
 NIL
@@ -877,9 +875,9 @@ NIL
 
 BUTTON
 10
-135
+195
 235
-168
+228
 Stop following divers
 reset-perspective
 NIL
@@ -894,9 +892,9 @@ NIL
 
 TEXTBOX
 370
-40
+100
 570
-82
+142
 1. Press setup to populate the world and feed the parameters into the model
 11
 15.0
@@ -904,9 +902,9 @@ TEXTBOX
 
 TEXTBOX
 375
-90
+150
 570
-118
+178
 2. Press Go to run the model until \"survey.time\" is reached
 11
 15.0
@@ -914,9 +912,9 @@ TEXTBOX
 
 SLIDER
 10
-270
+330
 235
-303
+363
 count.time.step
 count.time.step
 1
@@ -929,19 +927,19 @@ HORIZONTAL
 
 TEXTBOX
 10
-305
+365
 225
-335
-Divers count sharks every 2 seconds (original model) or every second.
+391
+Count animals in view every x seconds
 11
 15.0
 1
 
 TEXTBOX
 10
-180
+240
 245
-206
+266
 SAMPLING PARAMETERS___________
 11
 0.0
@@ -949,49 +947,49 @@ SAMPLING PARAMETERS___________
 
 TEXTBOX
 255
-330
+390
 575
-356
+416
 ANIMAL POPULATION PARAMETERS_____________________
 11
 0.0
 1
 
 TEXTBOX
-260
-610
-410
-651
+265
+885
+415
+926
 2. Choose a sampling method (activate it in the model run as well)
 11
 15.0
 1
 
 TEXTBOX
-260
-675
-410
-716
+265
+935
+415
+976
 3. Run the model to calculate the factor value for the selected method.
 11
 15.0
 1
 
 TEXTBOX
-295
-790
-555
-808
-Results appear in the output box below.
+280
+1030
+540
+1048
+Results appear in the output box above.
 13
 15.0
 1
 
 CHOOSER
 10
-790
+920
 235
-835
+965
 animal.shape
 animal.shape
 "sheep" "shark" "fish" "bird" "wolf" "cow" "circle"
@@ -999,9 +997,9 @@ animal.shape
 
 INPUTBOX
 10
-725
+855
 235
-785
+915
 animal.color
 9.0
 1
@@ -1010,24 +1008,24 @@ Color
 
 CHOOSER
 10
-840
+970
 235
-885
+1015
 surveyor.shape
 surveyor.shape
 "person" "diver" "arrow"
-0
+1
 
 SLIDER
 390
-220
+280
 565
-253
+313
 area.length
 area.length
 0
 150
-100.0
+80.0
 1
 1
 m
@@ -1035,14 +1033,14 @@ HORIZONTAL
 
 SLIDER
 390
-185
+245
 565
-218
+278
 area.width
 area.width
 0
 150
-100.0
+50.0
 1
 1
 m
@@ -1050,24 +1048,24 @@ HORIZONTAL
 
 SLIDER
 250
-440
+500
 460
-473
+533
 animal.mean.speed
 animal.mean.speed
 0
-10
-1.0
-0.5
+3
+0.2
+0.1
 1
 m/s
 HORIZONTAL
 
 SLIDER
 250
-475
+535
 460
-508
+568
 animal.dir.angle
 animal.dir.angle
 0
@@ -1080,9 +1078,9 @@ HORIZONTAL
 
 TEXTBOX
 470
-465
+535
 560
-515
+585
 animal turns between minus and plus this angle
 11
 15.0
@@ -1090,19 +1088,125 @@ animal turns between minus and plus this angle
 
 INPUTBOX
 250
-255
-565
 315
+565
+375
 environment.color
 102.0
 1
 0
 Color
 
+TEXTBOX
+65
+35
+545
+53
+Pais, M.P., Ward-Paige, C.A. (2015). AnimDens NetLogo model. Version 3.0 (2021)
+13
+4.0
+1
+
+SLIDER
+10
+480
+225
+513
+transect.length
+transect.length
+1
+100
+50.0
+1
+1
+m
+HORIZONTAL
+
+BUTTON
+100
+435
+225
+480
+set time for this length
+set survey.time precision ((transect.length / transect.speed) * 60) 0
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+TEXTBOX
+15
+515
+235
+540
+Survey time is what counts. Don't forget to set it if you need fixed length!
+11
+15.0
+1
+
+SLIDER
+10
+640
+235
+673
+stat.viewangle
+stat.viewangle
+120
+360
+360.0
+10
+1
+degrees
+HORIZONTAL
+
+MONITOR
+370
+585
+475
+630
+transect.area (m2)
+transect.area
+2
+1
+11
+
+MONITOR
+250
+585
+365
+630
+Stationary area (m2)
+stationary.area
+2
+1
+11
+
+BUTTON
+480
+585
+575
+630
+calculate areas
+  ; on the original model, the final part of the sampled area of the transect is assumed to be a rectangle (transect.width x visibility.length)\n\n  set transect.area transect.width * (transect.mean.speed * survey.time) + transect.width * visibility.length\n  \n  ; calculation of stationary area is trickier because it must take into account how much the diver will rotate, up to the maximum of 360 degrees, even if it exceeds in practice\n  \n  ifelse (stat.viewangle + (stationary.turning.angle * survey.time)) > 360 [\n    set stationary.area pi * (stationary.radius ^ 2)] [\n    set stationary.area ((stat.viewangle + (stationary.turning.angle * survey.time)) / 360) * pi * (stationary.radius ^ 2)\n  ]
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
 @#$#@#$#@
 ## WHAT IS IT?
 
-AnimDens NetLogo 2.0
+AnimDens NetLogo 3.0
 
 This is a model that simulates surveyors counting aninmals while deploying belt-transect, stationary-point-count and roving (random path) techniques. The model demonstrates how non-instantaneous sampling techniques produce bias by overestimating the number of counted animals, when they move relative to the surveyor.
 
@@ -1590,7 +1694,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.0
+NetLogo 6.1.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
