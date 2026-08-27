@@ -19,7 +19,7 @@ version: "3.0"
 # guessed, because a wrong release date propagates into every citation.
 # TODO: doi and url are assigned when the model is archived on CoMSES or
 # Zenodo (see AGENTS.md phase 9). Neither exists yet, so neither is asserted.
-repository-code: "https://bitbucket.org/MiguelPPais/animdens"
+repository-code: "https://github.com/miguelppais/animdens-netlogo"
 # The model has been licensed CC BY-NC-SA 4.0 since 2015, as its own Info Tab
 # states. The LICENSE file carries the full legal code.
 license: CC-BY-NC-SA-4.0
