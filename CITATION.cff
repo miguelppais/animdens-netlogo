@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+message: "If you use this model in your research, please cite it using the metadata below."
+type: software
+title: "[MODEL TITLE]"
+abstract: "[Brief description of the model and its purpose.]"
+authors:
+  - family-names: "[LAST NAME]"
+    given-names: "[FIRST NAME]"
+    orcid: "https://orcid.org/[YOUR-ORCID-ID]"
+    affiliation: "[INSTITUTION]"
+version: "[MODEL VERSION, e.g. 1.0.0]"
+date-released: "[YYYY-MM-DD]"
+doi: "[DOI assigned after archiving on CoMSES or Zenodo]"
+url: "https://www.comses.net/codebases/[UUID]/releases/[VERSION]/"
+repository-code: "https://github.com/[USERNAME]/[REPO]"
+license: MIT
+keywords:
+  - agent-based model
+  - NetLogo
+  - "[DOMAIN KEYWORD]"
+  - "[DOMAIN KEYWORD]"
+references:
+  - type: article
+    title: "[KEY REFERENCE PAPER TITLE]"
+    authors:
+      - family-names: "[LAST NAME]"
+        given-names: "[FIRST NAME]"
+    journal: "[JOURNAL NAME]"
+    year: [YYYY]
+    doi: "[DOI]"

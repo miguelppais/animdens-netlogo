@@ -1,0 +1,74 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+migrate.log
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Visual Studio Code related
+.vscode/
+.markdownlint-cli2.yaml
+
+# Secrets and local environment
+.env
+.env.*
+*.pem
+*.key
+scraper/.env
+
+# Local development and generated artifacts
+.claude/settings.local.json
+
+# Blackbox log files (large binary test data)
+*.bbl
+*.bbl.csv
+
+# Ignore Claude memory and local skill files
+.claude/
+SKILL.md
+
+
+.gemini/
+coverage/
+scratch/
+
+# NetLogo backups
+*.bak
+*.nlogo.bak
+*.nlogox.bak
+
+# BehaviorSpace and analysis output data (prevent committing large CSVs)
+# Store outputs in results/ — small summary files may be committed; large files should not
+*-table.csv
+*-spreadsheet.csv
+/experiments/*.csv
+/results/*.csv
+/results/*.pdf
+/results/*.png
+/results/*.svg
+
+# Raw data files larger than ~50 MB should be archived externally (Zenodo/Dryad)
+# and linked in data/README.md rather than committed here
+/data/raw/*.zip
+/data/raw/*.tar.gz
+
+# Temporary NetLogo files
+*.tmp
+
+# AI Agent Workflow Details (Private Local Pipeline)
+.agents/
+AGENTS.md
+.gemini/
+.claude/
+
