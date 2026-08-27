@@ -12,7 +12,6 @@
 globals[
   actual.area
   trans.viewangle
-  stat.viewangle
   rov.viewangle
   transect.mean.speed
   roving.mean.speed
@@ -70,7 +69,6 @@ to setup
   ask patches with [pcolor = black] [set pcolor environment.color + 1]
   set actual.area world-height * world-width
   set trans.viewangle 180
-  set stat.viewangle 160
   set rov.viewangle 160
   set transect.mean.speed (transect.speed / 60)  ; these 4 lines just convert interface speeds (in m/min) to m/s
   set roving.mean.speed (roving.speed / 60)
@@ -78,7 +76,13 @@ to setup
   ; on the original model, the final part of the sampled area of the transect is assumed to be a rectangle (transect.width x visibility.length)
 
   set transect.area transect.width * (transect.mean.speed * survey.time) + transect.width * visibility.length
-  set stationary.area pi * stationary.radius ^ 2
+
+  ; calculation of stationary area is trickier because it must take into account how much the diver will rotate, up to the maximum of 360 degrees, even if it exceeds in practice
+
+  ifelse (stat.viewangle + (stationary.turning.angle * survey.time)) > 360 [
+    set stationary.area pi * (stationary.radius ^ 2)] [
+    set stationary.area ((stat.viewangle + (stationary.turning.angle * survey.time)) / 360) * pi * (stationary.radius ^ 2)
+  ]
 
 ; if animal density is set to some number, then use that to calculate the number of animals to deploy. Otherwise, just use the numb.animals.
 
@@ -97,7 +101,7 @@ if transect? [                                         ;transect surveyor setup
   create-transsurveyors 1 [
  set heading 0
  set shape surveyor.shape
- set color blue
+ set color cyan
  set size 2
  setxy (world-width / 2) (world-height / 2)
  if show.paths? [pen-down]                                                           ;this shows the path of the surveyor
@@ -203,14 +207,18 @@ to do.outputs
     let real.count length counted.animals
     let expected.count animal.density * transect.area
     set t.bias (real.count - expected.count) / expected.count
-    output-type "Transect surveyor bias was " output-print precision t.bias 2           ; outputs bias with 2 decimal places
+    output-type "Transect relative bias: " output-print precision t.bias 2           ; outputs bias with 2 decimal places
+    output-type "Transect count: " output-print real.count
+    output-type "Transect density estimate " output-type precision (real.count / transect.area) 2 output-print " ind./m2"
   ]
 
  ask statsurveyors [
     let real.count length counted.animals
     let expected.count animal.density * stationary.area
     set s.bias (real.count - expected.count) / expected.count
-    output-type "Stationary surveyor bias was " output-print precision s.bias 2
+    output-type "Stationary relative bias: " output-print precision s.bias 2           ; outputs bias with 2 decimal places
+    output-type "Stationary count: " output-print real.count
+    output-type "Stationary density estimate " output-type precision (real.count / stationary.area) 2 output-print " ind./m2"
  ]
 
  ask rovsurveyors [
@@ -301,7 +309,16 @@ to do.rsurveyor.movement
 end
 
 to r.count.animals
-  let eligible.animals animals in-cone visibility.length stat.viewangle
+  ; DELIBERATE DIVERGENCE FROM UPSTREAM v3.0 - DO NOT "RECONCILE" THIS BACK.
+  ; The roving surveyor is a diver on a random walk (see do.rsurveyor.movement), and it has
+  ; always had its own declared view angle: rov.viewangle, set to 160 in setup. That variable
+  ; was declared, assigned, and then read nowhere - this in-cone call passed stat.viewangle,
+  ; the STATIONARY method's angle, instead. The defect is harmless in v2.0 because both angles
+  ; were hardcoded to 160, so the substitution was invisible. It stops being harmless in v3.0,
+  ; which turns stat.viewangle into an interface slider defaulting to 360: the roving diver
+  ; would silently count over a full circle instead of its intended 160-degree arc.
+  ; Upstream v3.0 (github dd65f63) still carries the defect; this line is our fix, not drift.
+  let eligible.animals animals in-cone visibility.length rov.viewangle
   let surveyor.memory memory
   let new.animals eligible.animals with [not member? who surveyor.memory] ; only animals that were not previously counted are counted
   if any? new.animals [
@@ -339,12 +356,24 @@ end]]></code>
     <button x="250" y="85" height="50" disableUntilTicks="true" forever="true" kind="Observer" width="105" display="Go">go</button>
     <button x="250" y="140" height="50" disableUntilTicks="true" forever="false" kind="Observer" width="105" display="Go once">go</button>
     <monitor x="250" precision="0" y="210" height="60" fontSize="11" width="130" display="Total area (sq. meters)">actual.area</monitor>
-    <slider x="10" step="1" y="465" max="10" width="225" display="transect.speed" height="50" min="1" direction="Horizontal" default="4.0" variable="transect.speed" units="m/min"></slider>
+    <slider x="10" step="1" y="465" max="10" width="225" display="transect.speed" height="50" min="1" direction="Horizontal" default="6.0" variable="transect.speed" units="m/min"></slider>
+    <slider x="10" step="1" y="520" max="100" width="225" display="transect.length" height="50" min="1" direction="Horizontal" default="50.0" variable="transect.length" units="m"></slider>
+    <button x="10" y="575" height="40" disableUntilTicks="false" forever="false" kind="Observer" width="225" display="set survey.time for this length">set survey.time precision ((transect.length / transect.speed) * 60) 0</button>
+    <slider x="10" step="10" y="823" max="360" width="225" display="stat.viewangle" height="50" min="120" direction="Horizontal" default="360.0" variable="stat.viewangle" units="degrees"></slider>
+    <note x="250" y="1110" backgroundDark="0" fontSize="11" width="310" markdown="false" height="18" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">SAMPLED AREAS (recalculated on setup)___</note>
+    <monitor x="250" precision="2" y="1135" height="60" fontSize="11" width="130" display="Stationary area (m2)">stationary.area</monitor>
+    <monitor x="385" precision="2" y="1135" height="60" fontSize="11" width="130" display="Transect area (m2)">transect.area</monitor>
+    <button x="520" y="1135" height="60" disableUntilTicks="false" forever="false" kind="Observer" width="100" display="calculate areas">set transect.mean.speed (transect.speed / 60)
+set transect.area transect.width * (transect.mean.speed * survey.time) + transect.width * visibility.length
+ifelse (stat.viewangle + (stationary.turning.angle * survey.time)) > 360 [
+  set stationary.area pi * (stationary.radius ^ 2)] [
+  set stationary.area ((stat.viewangle + (stationary.turning.angle * survey.time)) / 360) * pi * (stationary.radius ^ 2)
+]</button>
     <note x="10" y="442" backgroundDark="0" fontSize="11" width="150" markdown="false" height="18" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">Transect diver movement</note>
-    <note x="10" y="590" backgroundDark="0" fontSize="11" width="150" markdown="false" height="18" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">Stationary diver movement</note>
-    <slider x="10" step="1" y="613" max="90" width="225" display="stationary.turning.angle" height="50" min="0" direction="Horizontal" default="4.0" variable="stationary.turning.angle" units="degrees / sec"></slider>
+    <note x="10" y="690" backgroundDark="0" fontSize="11" width="150" markdown="false" height="18" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">Stationary diver movement</note>
+    <slider x="10" step="1" y="713" max="90" width="225" display="stationary.turning.angle" height="50" min="0" direction="Horizontal" default="0.0" variable="stationary.turning.angle" units="degrees / sec"></slider>
     <note x="255" y="466" backgroundDark="0" fontSize="11" width="150" markdown="false" height="18" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">Animal movement</note>
-    <chooser x="10" y="520" height="60" variable="transect.width" current="2" width="225" display="transect.width">
+    <chooser x="10" y="620" height="60" variable="transect.width" current="2" width="225" display="transect.width">
       <choice type="double" value="1.0"></choice>
       <choice type="double" value="2.0"></choice>
       <choice type="double" value="4.0"></choice>
@@ -354,50 +383,54 @@ end]]></code>
       <choice type="double" value="20.0"></choice>
     </chooser>
     <slider x="10" step="1" y="237" max="40" width="225" display="visibility.length" height="50" min="5" direction="Horizontal" default="13.0" variable="visibility.length" units="m"></slider>
-    <slider x="10" step="0.5" y="668" max="20" width="225" display="stationary.radius" height="50" min="1" direction="Horizontal" default="7.5" variable="stationary.radius" units="m"></slider>
-    <slider x="10" step="10" y="292" max="3600" width="225" display="survey.time" height="50" min="60" direction="Horizontal" default="300.0" variable="survey.time" units="seconds"></slider>
+    <slider x="10" step="0.5" y="768" max="20" width="225" display="stationary.radius" height="50" min="1" direction="Horizontal" default="6.5" variable="stationary.radius" units="m"></slider>
+    <slider x="10" step="60" y="292" max="1200" width="225" display="survey.time" height="50" min="60" direction="Horizontal" default="200.0" variable="survey.time" units="seconds"></slider>
     <input x="356" multiline="false" y="401" height="60" variable="animal.density" type="number" width="100">0.1</input>
-    <input x="250" multiline="false" y="401" height="60" variable="numb.animals" type="number" width="100">1000.0</input>
+    <input x="250" multiline="false" y="401" height="60" variable="numb.animals" type="number" width="100">400.0</input>
     <note x="463" y="400" backgroundDark="0" fontSize="11" width="134" markdown="false" height="34" textColorDark="-1" textColorLight="-2674135" backgroundLight="0"><![CDATA[If this is >0, it has priority over numb.animals]]></note>
     <note x="463" y="439" backgroundDark="0" fontSize="11" width="150" markdown="false" height="18" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">animals / m2</note>
-    <note x="34" y="540" backgroundDark="0" fontSize="11" width="26" markdown="false" height="19" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">m</note>
+    <note x="34" y="640" backgroundDark="0" fontSize="11" width="26" markdown="false" height="19" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">m</note>
     <output x="255" y="963" height="90" fontSize="11" width="300"></output>
-    <slider x="10" step="1" y="748" max="7" width="225" display="roving.speed" height="50" min="1" direction="Horizontal" default="4.0" variable="roving.speed" units="m/min"></slider>
-    <note x="10" y="725" backgroundDark="0" fontSize="11" width="150" markdown="false" height="18" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">Roving diver movement</note>
-    <slider x="10" step="1" y="803" max="45" width="225" display="roving.turning.angle" height="50" min="0" direction="Horizontal" default="4.0" variable="roving.turning.angle" units="º / 2 secs"></slider>
+    <slider x="10" step="1" y="903" max="7" width="225" display="roving.speed" height="50" min="1" direction="Horizontal" default="4.0" variable="roving.speed" units="m/min"></slider>
+    <note x="10" y="880" backgroundDark="0" fontSize="11" width="150" markdown="false" height="18" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">Roving diver movement</note>
+    <slider x="10" step="1" y="958" max="45" width="225" display="roving.turning.angle" height="50" min="0" direction="Horizontal" default="4.0" variable="roving.turning.angle" units="º / 2 secs"></slider>
     <switch x="10" y="30" height="40" on="true" variable="transect?" width="155" display="transect?"></switch>
     <switch x="10" y="75" height="40" on="true" variable="stationary?" width="155" display="stationary?"></switch>
     <switch x="10" y="120" height="40" on="false" variable="roving?" width="155" display="roving?"></switch>
     <note x="10" y="10" backgroundDark="0" fontSize="11" width="150" markdown="false" height="18" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">Select active sampling methods</note>
-    <switch x="10" y="930" height="40" on="true" variable="show.paths?" width="225" display="show.paths?"></switch>
-    <switch x="10" y="885" height="40" on="false" variable="show.surveyor.detail.windows?" width="225" display="show.surveyor.detail.windows?"></switch>
-    <note x="15" y="870" backgroundDark="0" fontSize="11" width="230" markdown="false" height="26" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">DISPLAY OPTIONS_____________________</note>
-    <button x="365" y="130" height="50" disableUntilTicks="false" forever="false" kind="Observer" width="200" display="Set default parameter values">set transect.speed 4
+    <switch x="10" y="1085" height="40" on="true" variable="show.paths?" width="225" display="show.paths?"></switch>
+    <switch x="10" y="1040" height="40" on="false" variable="show.surveyor.detail.windows?" width="225" display="show.surveyor.detail.windows?"></switch>
+    <note x="15" y="1025" backgroundDark="0" fontSize="11" width="230" markdown="false" height="26" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">DISPLAY OPTIONS_____________________</note>
+    <button x="365" y="130" height="50" disableUntilTicks="false" forever="false" kind="Observer" width="200" display="Set default parameter values">set transect.speed 6
 set transect.width 4
-set stationary.turning.angle 4
-set stationary.radius 7.5
+set transect.length 50
+set stat.viewangle 360
+set area.width 50
+set area.length 80
+set stationary.turning.angle 0
+set stationary.radius 6.5
 set transect? true
 set stationary? true
 set roving? false
 set roving.speed 4
 set roving.turning.angle 4
-set animal.mean.speed 1
+set animal.mean.speed 0.2
 set animal.dir.angle 45
 set animal.density 0.1
 set visibility.length 13
-set survey.time 300
+set survey.time 200
 set count.time.step 2
 set show.surveyor.detail.windows? false
 set show.paths? true
 set animal.shape "fish"
 set animal.color 9
 set environment.color 102
-set surveyor.shape "person"</button>
+set surveyor.shape "diver"</button>
     <monitor x="415" precision="2" y="763" height="60" fontSize="11" width="140" display="Transect factor value">transect.factor.value</monitor>
     <monitor x="415" precision="2" y="828" height="60" fontSize="11" width="140" display="Stationary factor value">stationary.factor.value</monitor>
     <note x="255" y="603" backgroundDark="0" fontSize="13" width="195" markdown="false" height="36" textColorDark="-1" textColorLight="-16777216" backgroundLight="0">BIAS CORRECTION CALCULATOR (use after model run)</note>
     <button x="255" y="893" height="40" disableUntilTicks="true" forever="false" kind="Observer" width="295" display="4. CALCULATE">calculate.bias</button>
-    <input x="415" multiline="false" y="633" height="60" variable="observed.value" type="number" width="140">10.0</input>
+    <input x="415" multiline="false" y="633" height="60" variable="observed.value" type="number" width="140">50.0</input>
     <note x="260" y="648" backgroundDark="0" fontSize="11" width="150" markdown="false" height="28" textColorDark="-1" textColorLight="-2674135" backgroundLight="0">1. Input the real count / density from the field survey:</note>
     <chooser x="415" y="698" height="60" variable="choose.method" current="0" width="140" display="choose.method">
       <choice type="string" value="transect"></choice>
@@ -417,7 +450,7 @@ set surveyor.shape "person"</button>
     <note x="260" y="693" backgroundDark="0" fontSize="11" width="150" markdown="false" height="41" textColorDark="-1" textColorLight="-2674135" backgroundLight="0">2. Choose a sampling method (activate it in the model run as well)</note>
     <note x="260" y="758" backgroundDark="0" fontSize="11" width="150" markdown="false" height="41" textColorDark="-1" textColorLight="-2674135" backgroundLight="0">3. Run the model to calculate the factor value for the selected method.</note>
     <note x="295" y="938" backgroundDark="0" fontSize="13" width="260" markdown="false" height="18" textColorDark="-1" textColorLight="-2674135" backgroundLight="0">Results appear in the output box below.</note>
-    <chooser x="10" y="1040" height="60" variable="animal.shape" current="2" width="225" display="animal.shape">
+    <chooser x="10" y="1195" height="60" variable="animal.shape" current="2" width="225" display="animal.shape">
       <choice type="string" value="sheep"></choice>
       <choice type="string" value="shark"></choice>
       <choice type="string" value="fish"></choice>
@@ -426,24 +459,24 @@ set surveyor.shape "person"</button>
       <choice type="string" value="cow"></choice>
       <choice type="string" value="circle"></choice>
     </chooser>
-    <input x="10" multiline="false" y="975" height="60" variable="animal.color" type="color" width="225">9.0</input>
-    <chooser x="10" y="1105" height="60" variable="surveyor.shape" current="0" width="225" display="surveyor.shape">
+    <input x="10" multiline="false" y="1130" height="60" variable="animal.color" type="color" width="225">9.0</input>
+    <chooser x="10" y="1260" height="60" variable="surveyor.shape" current="1" width="225" display="surveyor.shape">
       <choice type="string" value="person"></choice>
       <choice type="string" value="diver"></choice>
       <choice type="string" value="arrow"></choice>
     </chooser>
-    <slider x="390" step="1" y="240" max="150" width="175" display="area.length" height="50" min="0" direction="Horizontal" default="100.0" variable="area.length" units="m"></slider>
-    <slider x="390" step="1" y="185" max="150" width="175" display="area.width" height="50" min="0" direction="Horizontal" default="100.0" variable="area.width" units="m"></slider>
-    <slider x="250" step="0.5" y="486" max="10" width="210" display="animal.mean.speed" height="50" min="0" direction="Horizontal" default="1.0" variable="animal.mean.speed" units="m/s"></slider>
+    <slider x="390" step="1" y="240" max="150" width="175" display="area.length" height="50" min="0" direction="Horizontal" default="80.0" variable="area.length" units="m"></slider>
+    <slider x="390" step="1" y="185" max="150" width="175" display="area.width" height="50" min="0" direction="Horizontal" default="50.0" variable="area.width" units="m"></slider>
+    <slider x="250" step="0.1" y="486" max="3" width="210" display="animal.mean.speed" height="50" min="0" direction="Horizontal" default="0.2" variable="animal.mean.speed" units="m/s"></slider>
     <slider x="250" step="1" y="541" max="180" width="210" display="animal.dir.angle" height="50" min="0" direction="Horizontal" default="45.0" variable="animal.dir.angle" units="deg."></slider>
     <note x="470" y="514" backgroundDark="0" fontSize="11" width="90" markdown="false" height="50" textColorDark="-1" textColorLight="-2674135" backgroundLight="0">animal turns between minus and plus this angle</note>
     <input x="250" multiline="false" y="295" height="60" variable="environment.color" type="color" width="315">102.0</input>
   </widgets>
   <info><![CDATA[## WHAT IS IT?
 
-AnimDens NetLogo 2.0
+AnimDens NetLogo 3.0
 
-This is a model that simulates surveyors counting aninmals while deploying belt-transect, stationary-point-count and roving (random path) techniques. The model demonstrates how non-instantaneous sampling techniques produce bias by overestimating the number of counted animals, when they move relative to the surveyor.
+This is a model that simulates surveyors counting animals while deploying belt-transect, stationary-point-count and roving (random path) techniques. The model demonstrates how non-instantaneous sampling techniques produce bias by overestimating the number of counted animals, when they move relative to the surveyor.
 
 The model intends to reflect what happens with many animal censuses (underwater visual census of fish, aerial surveys, bird transects, etc.).
 
@@ -453,84 +486,123 @@ Using the provided bias calculator, it is possible to use the output of the mode
 
 ## HOW IT WORKS
 
-The model assumes an area that is featureless and flat, with a default size of 200x200 cells each with an area of 1 square meter. The origin of the coordinate system is on the bottom left corner.
+The model assumes an area that is featureless and flat, sized by the `area.width` and `area.length` sliders (default 50 m by 80 m, that is, 4000 cells of one square meter each). The origin of the coordinate system is on the bottom left corner.
 
-For each simulation, the surveyors start in the middle and face north. aninmals and transect surveyors move every second, but the time step for counting can be set to 2 seconds for shorter computing times (set by default on the original model, but note that some aninmals may be missed, particularly if they are very fast).
+For each simulation, the surveyors start in the middle and face north. Animals and the transect and roving surveyors move every second, but the time step for counting can be set to 2 seconds for shorter computing times (set by default on the original model, but note that some animals may be missed, particularly if they are very fast).
 
-At each counting time step, surveyors count the number of aninmals they can see based on the direction the surveyor is facing, the visibility distance and angle. Viewing angles are fixed and cannot be changed on the interface. They are set to 160º for the stationary and roving surveyors and 180º for the transect surveyor.
+At each counting time step, surveyors count the number of animals they can see, based on the direction the surveyor is facing, the viewing distance and the viewing angle:
+
+- The transect surveyor sees within `visibility.length` over a fixed 180º arc.
+- The stationary surveyor sees within `stationary.radius` over the arc set by the `stat.viewangle` slider (120º to 360º, default 360º). This is the only viewing angle exposed on the interface; at 360º the surveyor counts in every direction, regardless of where it is facing.
+- The roving surveyor sees within `visibility.length` over a fixed 160º arc.
 
 On the belt-transect method, only animals within the transect width are counted, while on the stationary-point-count method, only animals within a pre-determined radius are counted.
 
-Transect surveyor moves in a fixed direction at a constant speed (default is 4 m/minute).
+The transect surveyor moves in a fixed direction (north) at a constant speed (default is 6 m/minute).
 
-Stationary surveyor rotates a given number of degrees clockwise every second (default is 4).
+The stationary surveyor does not move, and rotates `stationary.turning.angle` degrees clockwise every second (default is 0, so by default it stays facing north).
 
-Aninmals move at a speed specified by the user, and travel in a direction that is restricted by a turning angle based on the previous direction.
+Animals move at a speed specified by the user, and travel in a direction that is restricted by a turning angle based on the previous direction.
 
-Roving surveyors move similarly to aninmals and have their own speed and turning angle parameters. Turning happens every 2 seconds.
+Roving surveyors move similarly to animals and have their own speed and turning angle parameters. Turning happens every 2 seconds.
 
-Aninmals and surveyors that reach the boundaries of the area wrap around to the opposite side, to keep the density constant (on the original model they can leave the area, but that doesn't seem to have significant effects on the output, if the area is large enough.
+Animals and surveyors that reach the boundaries of the area wrap around to the opposite side, to keep the density constant (on the original model they can leave the area, but that doesn't seem to have significant effects on the output, if the area is large enough).
 
-Surveyors keep a memory of every individual aninmal counted and do not recount.
+Surveyors keep a memory of every individual animal counted and do not recount.
 
 ## HOW TO USE IT
 
 The model runs in real time by default, which is slow (1 second in the model equals 1 second in real life). In order to speed up model runs, increase the speed in the slider or disable update view (at the top).
 
-The "setup" button feeds all parameter values into the model, places the selected surveyors and spreads all the aninmals across the area.
+The "setup" button feeds all parameter values into the model, places the selected surveyors and spreads all the animals across the area.
 
-The "go" button runs the model for the time specified in survey.time (default is 300 seconds) and then stops. The model can be stopped or paused at any time by pressing the go button while it is running. The "go once" button avances the model run by 1 second each time.
+The "go" button runs the model for the time specified in `survey.time` (default is 200 seconds) and then stops. The model can be stopped or paused at any time by pressing the go button while it is running. The "go once" button advances the model run by 1 second each time.
 
-"transect.width" sets the width of the belt transect that is sampled as the surveyor swims in the center (half of the width to each side of the surveyor).
+Select the sampling methods that will be in the model run by turning their switches on and off on the interface (by default, transect and stationary are on and roving is off). Please note that the roving surveyor will not calculate densities and thus will not estimate bias. Each method has a "Follow" button that locks the view onto that surveyor during a run, and "Stop following divers" returns to the normal view.
 
-To set the initial number of aninmals, introduce the total number of aninmals directly under "numb.aninmals" on the interface. Alternatively (and preferably), you can set the real density needed under "aninmal.density" and the model will place the right number of aninmals for the total area. If aninmal.density is set to a value greater than 0 when the model starts, it has priority over "numb.aninmals".
+The "Set default parameter values" button restores every slider, switch and chooser to the default stated for it below. It leaves three boxes alone: `numb.animals`, because setup recomputes it from `animal.density` whenever that is above 0, and `observed.value` and `choose.method`, because those hold your own field data for the bias calculator rather than model parameters.
 
-Select the sampling methods that will be in the model run by turning their swiches on and off on the interface. Please note that the roving surveyor will not calculate densities and thus will not estimate bias. If you want to see the details of every surveyor in a floating window during the run, switch on "show.surveyor.detail.windows?".
+### Sampling parameters
 
-If you want the transect and roving surveyors to draw a path as they move, switch on "show.paths?".
+- `visibility.length` (default 13 m): how far a surveyor can see. It is the viewing radius of the transect and roving surveyors, and the upper limit for `stationary.radius`.
+- `survey.time` (default 200 seconds): duration of the survey. The run stops when it is reached.
+- `count.time.step` (default 2 seconds): how often surveyors count. 2 seconds is the original model's behaviour; 1 second misses fewer animals but takes longer to run.
+- `transect.speed` (default 6 m/min): swimming speed of the belt-transect surveyor.
+- `transect.width` (default 4 m): width of the belt transect that is sampled as the surveyor swims in the center (half of the width to each side of the surveyor).
+- `transect.length` (default 50 m): the length of transect you intend to survey. This slider does not feed the model directly. It exists for the "set survey.time for this length" button, which converts it into the `survey.time` that the transect surveyor needs to swim that length at the current `transect.speed`.
+- `stationary.radius` (default 6.5 m): radius sampled by the stationary surveyor. It must not be set higher than `visibility.length`; if it is, the run stops with an error in the output box, because the surveyor would be committing to sample an area it cannot see.
+- `stat.viewangle` (default 360º): the arc the stationary surveyor counts over.
+- `stationary.turning.angle` (default 0 degrees/second): how fast the stationary surveyor rotates clockwise.
+- `roving.speed` (default 4 m/min): swimming speed of the roving surveyor.
+- `roving.turning.angle` (default 4º): the roving surveyor turns by a random angle between minus and plus this value, every 2 seconds.
 
-Stationary.radius must be set to a value lower than visibility.length.
+### Animal population parameters
 
-In the end of each run, each surveyor reports its relative bias, calculated as:
+To set the initial number of animals, introduce the total number of animals directly under `numb.animals` on the interface (default 400). Alternatively (and preferably), you can set the real density needed under `animal.density` (default 0.1 animals per square meter) and the model will place the right number of animals for the total area. If `animal.density` is set to a value greater than 0 when the model starts, it has priority over `numb.animals`.
 
-(real count - expected count) / expected count
+- `animal.mean.speed` (default 0.2 m/s): how far each animal travels every second.
+- `animal.dir.angle` (default 45 degrees): each animal turns by a random angle between minus and plus this value at every step.
 
-where "expected count" is basically the aninmal density in the model multiplied by the total sampled area.
+### Area and display options
 
-For the stationary surveyor:
+- `area.width` (default 50 m) and `area.length` (default 80 m): the dimensions of the sampled area. Both are read at setup, which resizes the world and rescales the patches to fit.
+- `show.surveyor.detail.windows?` (default off): opens a floating inspector window for each surveyor during the run.
+- `show.paths?` (default on): the transect and roving surveyors draw their path as they move.
+- `animal.shape` (default fish), `animal.color` (default 9), `surveyor.shape` (default diver) and `environment.color` (default 102) are cosmetic and do not affect results.
 
-sampled area = pi * stationary.radius^2
+### Sampled areas and outputs
+
+The "Total area (sq. meters)" monitor reports the size of the world. The "Stationary area (m2)" and "Transect area (m2)" monitors report the area each method samples. They are recalculated at every setup, and the "calculate areas" button recalculates them without running the model, so that parameter combinations can be compared before committing to a run.
+
+At the end of each run, the transect and the stationary surveyor each report three lines in the output box: the relative bias, the raw count, and the density estimate that count implies. The roving surveyor reports the distance it swam and how many animals it counted, and nothing else. It has no defined sampled area, so it cannot estimate density or bias.
+
+Relative bias is calculated as:
+
+`(real count - expected count) / expected count`
+
+where "expected count" is basically the animal density in the model multiplied by the total sampled area.
+
+For the stationary surveyor, the sampled area takes into account how much the surveyor rotates during the survey. The arc it will have swept by the end of the run is `stat.viewangle + stationary.turning.angle * survey.time`. If that reaches a full circle, the sampled area is the whole disc:
+
+`sampled area = pi * stationary.radius ^ 2`
+
+Otherwise, only the swept fraction of the disc is sampled:
+
+`sampled area = ((stat.viewangle + stationary.turning.angle * survey.time) / 360) * pi * stationary.radius ^ 2`
+
+With the default `stat.viewangle` of 360º the surveyor already sees all around itself, so the first case applies and the rotation makes no difference. Narrow the slider and the rotation speed starts to matter.
 
 For the transect surveyor:
 
-sampled area = survey.time * (transect.surveyor.speed / 60) * transect.width + visibility length * transect.width
+`sampled area = survey.time * (transect.speed / 60) * transect.width + visibility.length * transect.width`
 
 Notice that the final part of the transect is approximated to a rectangle of length equal to the visibility length, instead of taking into account the arc produced by the cone of vision. This was done in the original model and, with relatively large visibility lengths, does not seem to have much impact on the final result.
 
-The model will also output the conversion factor value for each method (transect and stationary). The real count (in the field) divided by this factor value should provide an estimate that is corrected to account for bias (given that all parameters are realistically set).
+The model will also output the conversion factor value for each method (transect and stationary), shown in the "Transect factor value" and "Stationary factor value" monitors. The real count (in the field) divided by this factor value should provide an estimate that is corrected to account for bias (given that all parameters are realistically set).
 
 ## THINGS TO NOTICE
 
 If "view updates" is enabled and speed is set to "normal", the model will run in real time (every second in the model will run in one second).
 
-To understand the source of the bias, compare a model run with aninmal.mean.speed set to 0 m/s (stationary aninmals) and another with aninmal.mean.speed set to 1 m/s. Keep everything else default.
+To understand the source of the bias, compare a model run with `animal.mean.speed` set to 0 m/s (stationary animals) and another with `animal.mean.speed` set to 1 m/s. Keep everything else default.
 
-In the first case (stationary aninmals), the sampling method will be equivalent to taking a snapshot of the whole sampling area. The aninmals will stand still and the surveyor will count every aninmal in the sampling area, not repeating any aninmal. This will produce little to no bias in the estimates.
+In the first case (stationary animals), the sampling method will be equivalent to taking a snapshot of the whole sampling area. The animals will stand still and the surveyor will count every animal in the sampling area, not repeating any animal. This will produce little to no bias in the estimates.
 
-In the case where aninmals move 1 meter every second (while the surveyor is moving 4 meters every minute), there will be new aninmals coming into the sampling area that were not there in the beginning. These aninmals will all be counted as they pass in front of the surveyor, increasing the number of counted aninmals, while the real number of aninmals in the beginning was much lower. This produces the bias.
+In the case where animals move 1 meter every second (while the transect surveyor is moving 6 meters every minute), there will be new animals coming into the sampling area that were not there in the beginning. These animals will all be counted as they pass in front of the surveyor, increasing the number of counted animals, while the real number of animals in the beginning was much lower. This produces the bias.
 
-If the speed of the aninmals is even higher, there are more aninmals coming into the field of view of the surveyor and the bias will be even higher.
+If the speed of the animals is even higher, there are more animals coming into the field of view of the surveyor and the bias will be even higher.
 
 ## THINGS TO TRY
 
-- Switch on just the transect surveyor and see how increasing aninmal speeds increases bias. Why does this happen?
+- Switch on just the transect surveyor and see how increasing animal speeds increases bias. Why does this happen?
 
 - Do the same for the stationary surveyor. The results are similar, why?
 
-- With stationary aninmals (speed 0) and moving surveyors, bias is almost zero, but what about stationary surveyors with moving aninmals? Place a stationary surveyor with stationary.turning.angle set to 0 and aninmals with speed > 0 and see the results.
+- With stationary animals (speed 0) and moving surveyors, bias is almost zero, but what about stationary surveyors with moving animals? Place a stationary surveyor with `stationary.turning.angle` set to 0 and animals with speed above 0 and see the results.
 
-- Run a model in real time (normal speed and "view updates" checked) with the default parameters. While it is running, press the follow button in front of the transect surveyor switch to focus the view on that surveyor. Now head to the top right corner of the world window and click "3D" to go to the 3D view. Observing the surveyor from this perspective as it counts aninmals is a great way of understanding the bias in non-instantaneous sampling of moving animals.
+- Reduce `stat.viewangle` from 360º to 180º and run the stationary method again. The surveyor now samples half a disc instead of a whole one, and the sampled area, the count and the bias move together. Then raise `stationary.turning.angle` and watch the surveyor sweep that narrower cone around until it has covered the full circle anyway.
 
+- Run a model in real time (normal speed and "view updates" checked) with the default parameters. While it is running, press the follow button in front of the transect surveyor switch to focus the view on that surveyor. Now head to the top right corner of the world window and click "3D" to go to the 3D view. Observing the surveyor from this perspective as it counts animals is a great way of understanding the bias in non-instantaneous sampling of moving animals.
 
 ## USING THE BIAS CALCULATOR
 
@@ -538,26 +610,58 @@ The model can be used as a tool to get better estimates from field surveys using
 
 To make corrections to observed values (values observed in the field by non-instantaneous surveys):
 
-1. Decide on targeted aninmal species and select an appropriate speed and turning angle for that species.
-2. Select most appropriate sampling values (e.g. transect width, swim speed, survey time, etc.) Note: for visibility, select the distance you would be sure to detect the targeted aninmal.
+1. Decide on targeted animal species and select an appropriate speed and turning angle for that species.
+2. Select most appropriate sampling values (e.g. transect width, swim speed, survey time, etc.) Note: for visibility, select the distance you would be sure to detect the targeted animal.
 3. Run the model with the selected parameters, making sure that your sampling method of choice is turned on in the switches.
 4. After the survey time finishes the model stops and the conversion factor is calculated.
-5. On the calculator, go to the "observed.value" box and input the number of aninmals from that species you counted in the field
-6. Select the appropriate method on the calculator (transect or stationary)
+5. On the calculator, go to the `observed.value` box and input the number of animals from that species you counted in the field.
+6. Select the appropriate method on the calculator (transect or stationary).
 7. Press calculate. The result is the "real" count, corrected for bias.
 8. Repeat for other species.
 
+## EXTENDING THE MODEL
+
+The model carries a single animal species, with one speed and one turning angle. The counting procedures already record a species name rather than just a tally, so giving animals more than one species identity would let a single run compare bias across species that differ in mobility, which is a comparison the original paper makes across separate runs.
+
+Animal movement is an unconstrained random walk. Schooling, territoriality, and attraction to or avoidance of the surveyor are all absent, and any of them would change how quickly new animals enter the sampled area, which is where the bias comes from.
+
+The transect counting procedure only works for a transect heading north, because it filters animals by their horizontal distance from the surveyor. Letting the transect follow an arbitrary heading means rewriting that filter in terms of the distance to the surveyor's own axis.
+
+## NETLOGO FEATURES
+
+The surveyors are three separate breeds rather than one breed with a method variable, so each carries only the variables its own method needs, and each has its own movement and counting procedure.
+
+Detection uses `in-cone`, which combines the viewing distance and the viewing angle in a single primitive. That is what makes the three viewing geometries described above a one-line difference between the methods.
+
+Each surveyor keeps a `memory` list of the `who` numbers it has already counted and filters new sightings against it, so an animal seen twice is only counted once. This is what makes a count non-instantaneous, and therefore what produces the bias the model is about.
+
+The world is not fixed at compile time: `setup` calls `resize-world` and `set-patch-size` using the `area.width` and `area.length` sliders, so the view rescales to the area being simulated.
+
+The `t.bias-result`, `s.bias-result`, `transect.factor.value` and `stationary.factor.value` reporters exist so that BehaviorSpace experiments can harvest bias and correction factors directly, instead of parsing the output box.
+
 ## NOTES ON THE ADAPTATION TO NETLOGO
 
-On the original model, the aninmals could leave the area and come back (or leave permanently). Here the world is set to wrap around the edges. For an area that is large enough, this does not seem to affect the final results. In order to reflect what was made in the original model in R, one can set a buffer area around where no aninmals are placed. If for some reason we want aninmals to leave and never come back, we can just remove them when they reach the edges.
+On the original model, the animals could leave the area and come back (or leave permanently). Here the world is set to wrap around the edges. For an area that is large enough, this does not seem to affect the final results. In order to reflect what was made in the original model in R, one can set a buffer area around where no animals are placed. If for some reason we want animals to leave and never come back, we can just remove them when they reach the edges.
 
-The aninmals in NetLogo have a visual representation, unlike in the original R model, where they were just points. However, in the counting procedure only the coordinates of the aninmals are checked to see if they are counted, so their size is basically ignored and does not influence results.
+The animals in NetLogo have a visual representation, unlike in the original R model, where they were just points. However, in the counting procedure only the coordinates of the animals are checked to see if they are counted, so their size is basically ignored and does not influence results.
+
+## VERSION NOTES
+
+This is version 3.0 of the NetLogo implementation, running on NetLogo 7. Two things in it differ deliberately from the version 3.0 distributed elsewhere, and both are corrections rather than drift.
+
+### The roving surveyor's viewing angle is its own
+
+The roving surveyor has always had a declared viewing angle of 160º, and this documentation has always said so, but the counting procedure read the stationary surveyor's angle instead. While both angles were fixed at 160º, the substitution was invisible. It stops being invisible once `stat.viewangle` becomes a slider defaulting to 360º: the roving surveyor would then count over a full circle rather than its intended 160º arc, and count far more animals for it. Here the roving surveyor counts over 160º, as documented.
+
+### The "Set default parameter values" button agrees with the sliders
+
+That button is the model's own statement of its defaults, and it is the only such statement that survives someone saving the model with the sliders left wherever a test run put them. Every parameter it sets is set to the value the interface ships with, and to the value stated for it above. Elsewhere in version 3.0 the button contradicts the sliders on several parameters and never sets another, so pressing it moves the model away from its own defaults while appearing to restore them.
 
 ## RELATED MODELS
 
 The original AnimDens model was implemented in R by Christine Ward-Paige, Joanna Mills Flemming and Heike K. Lotze. The code can be downloaded at:
 
-http://journals.plos.org/plosone/article/asset?unique&id=info:doi/10.1371/journal.pone.0011722.s001
+<http://journals.plos.org/plosone/article/asset?unique&id=info:doi/10.1371/journal.pone.0011722.s001>
 
 ## CREDITS AND REFERENCES
 
@@ -571,21 +675,21 @@ If you use this model, please cite the original publication:
 
 Ward-Paige, C.A., Flemming, J.M., Lotze, H.K., 2010. Overestimating Fish Counts by Non-Instantaneous Visual Censuses: Consequences for Population and Community Descriptions. PLoS ONE 5(7): e11722. doi:10.1371/journal.pone.0011722
 
-URL: http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0011722
+URL: <http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0011722>
 
 Another publication that uses a roving diver:
 
-Ward-Paige, C.A., Lotze, H.K., 2011. Assessing the Value of Recreational surveyors for Censusing Elasmobranchs. PLoS ONE 6(10): e25609. doi:10.1371/journal.pone.0025609
+Ward-Paige, C.A., Lotze, H.K., 2011. Assessing the Value of Recreational Divers for Censusing Elasmobranchs. PLoS ONE 6(10): e25609. doi:10.1371/journal.pone.0025609
 
-URL: http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0025609
+URL: <http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0025609>
 
 In order to cite the NetLogo implementation:
 
-Pais, M.P., Ward-Paige, C.A. (2015). AnimDens NetLogo model. http://modelingcommons.org/browse/one_model/4408
+Pais, M.P., Ward-Paige, C.A. (2015). AnimDens NetLogo model. <http://modelingcommons.org/browse/one_model/4408>
 
 In order to cite the NetLogo software:
 
-Wilensky, U. (1999). NetLogo. http://ccl.northwestern.edu/netlogo/. Center for Connected Learning and Computer-Based Modeling, Northwestern Institute on Complex Systems, Northwestern University, Evanston, IL.
+Wilensky, U. (1999). NetLogo. <http://ccl.northwestern.edu/netlogo/>. Center for Connected Learning and Computer-Based Modeling, Northwestern Institute on Complex Systems, Northwestern University, Evanston, IL.
 
 ## COPYRIGHT AND LICENSE
 
@@ -593,7 +697,7 @@ Copyright 2015 Miguel Pessanha Pais and Christine Ward-Paige.
 
 ![CC BY-NC-SA 4.0](http://ccl.northwestern.edu/images/creativecommons/byncsa.png)
 
-This work is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 License.  To view a copy of this license, visit http://creativecommons.org/licenses/by-nc-sa/4.0/ or send a letter to Creative Commons, 559 Nathan Abbott Way, Stanford, California 94305, USA.]]></info>
+This work is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 License.  To view a copy of this license, visit <http://creativecommons.org/licenses/by-nc-sa/4.0/> or send a letter to Creative Commons, 559 Nathan Abbott Way, Stanford, California 94305, USA.]]></info>
   <turtleShapes>
     <shape name="default" rotatable="true" editableColorIndex="0">
       <polygon color="-1920102913" filled="true" marked="true">
