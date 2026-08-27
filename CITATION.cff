@@ -13,7 +13,7 @@ authors:
     given-names: "Christine A."
     # TODO: ORCID and affiliation for the second author are not recorded in
     # this repository. Confirm with the author before filling.
-version: "3.0"
+version: "4.0"
 # TODO: date-released is unknown for this revision. Fill in the release date
 # (YYYY-MM-DD) when this version is tagged or archived. Left out rather than
 # guessed, because a wrong release date propagates into every citation.

@@ -1,6 +1,6 @@
 ## WHAT IS IT?
 
-AnimDens NetLogo 3.0
+AnimDens NetLogo 4.0
 
 This is a model that simulates surveyors counting animals while deploying belt-transect, stationary-point-count and roving (random path) techniques. The model demonstrates how non-instantaneous sampling techniques produce bias by overestimating the number of counted animals, when they move relative to the surveyor.
 
@@ -56,7 +56,7 @@ The "Set default parameter values" button restores every slider, switch and choo
 - `transect.speed` (default 6 m/min): swimming speed of the belt-transect surveyor.
 - `transect.width` (default 4 m): width of the belt transect that is sampled as the surveyor swims in the center (half of the width to each side of the surveyor).
 - `transect.length` (default 50 m): the length of transect you intend to survey. This slider does not feed the model directly. It exists for the "set survey.time for this length" button, which converts it into the `survey.time` that the transect surveyor needs to swim that length at the current `transect.speed`.
-- `stationary.radius` (default 6.5 m): radius sampled by the stationary surveyor. It must not be set higher than `visibility.length`; if it is, the run stops with an error in the output box, because the surveyor would be committing to sample an area it cannot see.
+- `stationary.radius` (default 6.5 m): radius sampled by the stationary surveyor. It must not be set higher than `visibility.length`, because the surveyor would be committing to sample an area it cannot see. If it is, setup refuses the configuration: it explains the problem in the output box and builds nothing, and go will not run until you lower the radius or raise the visibility and press setup again.
 - `stat.viewangle` (default 360º): the arc the stationary surveyor counts over.
 - `stationary.turning.angle` (default 0 degrees/second): how fast the stationary surveyor rotates clockwise.
 - `roving.speed` (default 4 m/min): swimming speed of the roving surveyor.
@@ -81,6 +81,8 @@ To set the initial number of animals, introduce the total number of animals dire
 The "Total area (sq. meters)" monitor reports the size of the world. The "Stationary area (m2)" and "Transect area (m2)" monitors report the area each method samples. They are recalculated at every setup, and the "calculate areas" button recalculates them without running the model, so that parameter combinations can be compared before committing to a run.
 
 At the end of each run, the transect and the stationary surveyor each report three lines in the output box: the relative bias, the raw count, and the density estimate that count implies. The roving surveyor reports the distance it swam and how many animals it counted, and nothing else. It has no defined sampled area, so it cannot estimate density or bias.
+
+If a run is set up with no animals at all (both `animal.density` and `numb.animals` at 0), relative bias is undefined rather than zero, and the model says so instead of printing a 0 that would read as "unbiased".
 
 Relative bias is calculated as:
 
@@ -171,17 +173,39 @@ On the original model, the animals could leave the area and come back (or leave 
 
 The animals in NetLogo have a visual representation, unlike in the original R model, where they were just points. However, in the counting procedure only the coordinates of the animals are checked to see if they are counted, so their size is basically ignored and does not influence results.
 
-## VERSION NOTES
+## WHAT'S NEW IN VERSION 4.0
 
-This is version 3.0 of the NetLogo implementation, running on NetLogo 7. Two things in it differ deliberately from the version 3.0 distributed elsewhere, and both are corrections rather than drift.
+This is version 4.0 of the NetLogo implementation, running on NetLogo 7. It fixes five defects that were found while this documentation was being checked line by line against the code.
 
-### The roving surveyor's viewing angle is its own
+Two of those fixes change numerical results. **Output from version 4.0 is not comparable with output from version 3.0 or earlier.** If you have results from an earlier version, re-run them under 4.0 rather than comparing across the two. All five defects were present in 3.0, and the 3.0 release distributed elsewhere still carries them.
 
-The roving surveyor has always had a declared viewing angle of 160º, and this documentation has always said so, but the counting procedure read the stationary surveyor's angle instead. While both angles were fixed at 160º, the substitution was invisible. It stops being invisible once `stat.viewangle` becomes a slider defaulting to 360º: the roving surveyor would then count over a full circle rather than its intended 160º arc, and count far more animals for it. Here the roving surveyor counts over 160º, as documented.
+### Animal and surveyor turns were biased clockwise (changes results)
+
+The reporter that draws a random turn angle drew from `[a, b + 1)` instead of `[a, b)`. Both places that call it pass a symmetric pair of angles and expect a mean of zero, so every draw carried a mean offset of half a degree clockwise: for every animal every second, and for the roving surveyor every two seconds. The offset was half a degree regardless of what the turning angle was set to, which is worst at `animal.dir.angle` 0 — where animals should swim in a straight line, and instead every one of them curled clockwise at half a degree per second. The draw could also exceed the maximum the slider names: at `animal.dir.angle` 45 the old reporter could return a turn of +45.9995º.
+
+The proof of the defect is at the level of the reporter itself, and it is unambiguous: over 500,000 draws at `animal.dir.angle` 45, the mean turn was +0.486º before the fix and indistinguishable from zero after it.
+
+How much this moves survey counts is a separate question, and it is not settled. A first comparison at 10 replicates suggested around 10% for the transect method; that difference disappeared at 40 replicates, and at 120 replicates the two survey methods swapped which of them showed the larger effect. What survives all three attempts is that every one of the six comparisons had the same sign, which would be unlikely (roughly a 3% chance) if there were no effect at all. So there is probably a real effect on counts, consistent in direction, of at most a few percent — with the magnitude unresolved until someone runs a proper sweep. No single number from those trials is quoted here, because choosing one would mean choosing the most flattering one.
+
+### The roving surveyor used the stationary surveyor's viewing angle (changes results for the roving method)
+
+The roving surveyor has always had a declared viewing angle of 160º, and this documentation has always said so, but the counting procedure read the stationary surveyor's angle instead. While both angles were fixed at 160º the substitution was invisible. It stopped being invisible in version 3.0, which turned the stationary angle into a slider defaulting to 360º: the roving surveyor then counted over a full circle rather than its intended 160º arc, inflating its counts by around 44% at the default settings, with no overlap between the two versions' ranges over five replicates. The roving surveyor now counts over 160º, as documented.
+
+### A survey with no animals never terminated
+
+If a run was set up with no animals at all, the end-of-run report divided by an expected count of zero. The division threw an error, which aborted the reporting procedure before it could stop the run — so the model kept ticking past its own survey time, printing a fresh error every tick, and **exited with a success code**. A run that never terminates, produces garbage, and reports success is invisible to anything a caller can check, which is why this survived undetected for a decade. Such a run now ends at its survey time and reports the bias as undefined rather than as zero.
+
+### The world could be sized to zero
+
+The `area.width` and `area.length` sliders had a minimum of 0. At 0, setup asked NetLogo to resize the world to a negative extent and to divide by zero while scaling the patches. Both sliders now start at 1. This changes no result: it removes a configuration that could never have run.
+
+### The visibility guard ran after the clock had started
+
+The check that `stationary.radius` does not exceed `visibility.length` sat inside the go procedure, after the tick counter had advanced, so it fired once per tick and only after the model had built a full population it was never going to survey. It now runs during setup, before the world is built, and go refuses to run on a configuration that setup rejected. This changes no result.
 
 ### The "Set default parameter values" button agrees with the sliders
 
-That button is the model's own statement of its defaults, and it is the only such statement that survives someone saving the model with the sliders left wherever a test run put them. Every parameter it sets is set to the value the interface ships with, and to the value stated for it above. Elsewhere in version 3.0 the button contradicts the sliders on several parameters and never sets another, so pressing it moves the model away from its own defaults while appearing to restore them.
+This is not a defect fix but it is a difference worth knowing about. That button is the model's own statement of its defaults, and it is the only such statement that survives someone saving the model with the sliders left wherever a test run put them. Every parameter it sets is set to the value the interface ships with, and to the value stated for it above. In version 3.0 as distributed elsewhere the button contradicts the sliders on several parameters and never sets another, so pressing it moves the model away from its own defaults while appearing to restore them.
 
 ## RELATED MODELS
 
