@@ -1,30 +1,47 @@
 cff-version: 1.2.0
 message: "If you use this model in your research, please cite it using the metadata below."
 type: software
-title: "[MODEL TITLE]"
-abstract: "[Brief description of the model and its purpose.]"
+title: "AnimDens NetLogo"
+abstract: "An agent-based model of surveyors counting animals with belt-transect, stationary-point-count and roving (random path) techniques. It demonstrates how non-instantaneous sampling overestimates counts when animals move relative to the surveyor, and provides a calculator that corrects field counts for that bias. NetLogo implementation of the AnimDens model of Ward-Paige et al. (2010), originally written in R."
 authors:
-  - family-names: "[LAST NAME]"
-    given-names: "[FIRST NAME]"
-    orcid: "https://orcid.org/[YOUR-ORCID-ID]"
-    affiliation: "[INSTITUTION]"
-version: "[MODEL VERSION, e.g. 1.0.0]"
-date-released: "[YYYY-MM-DD]"
-doi: "[DOI assigned after archiving on CoMSES or Zenodo]"
-url: "https://www.comses.net/codebases/[UUID]/releases/[VERSION]/"
-repository-code: "https://github.com/[USERNAME]/[REPO]"
-license: MIT
+  - family-names: "Pais"
+    given-names: "Miguel Pessanha"
+    # TODO: ORCID not recorded anywhere in this repository — fill it in rather
+    # than leaving it out; a citation widget without one cannot disambiguate.
+    affiliation: "Faculdade de Ciências, Universidade de Lisboa"
+  - family-names: "Ward-Paige"
+    given-names: "Christine A."
+    # TODO: ORCID and affiliation for the second author are not recorded in
+    # this repository. Confirm with the author before filling.
+version: "3.0"
+# TODO: date-released is unknown for this revision. Fill in the release date
+# (YYYY-MM-DD) when this version is tagged or archived. Left out rather than
+# guessed, because a wrong release date propagates into every citation.
+# TODO: doi and url are assigned when the model is archived on CoMSES or
+# Zenodo (see AGENTS.md phase 9). Neither exists yet, so neither is asserted.
+repository-code: "https://bitbucket.org/MiguelPPais/animdens"
+# The model has been licensed CC BY-NC-SA 4.0 since 2015, as its own Info Tab
+# states. The LICENSE file carries the full legal code.
+license: CC-BY-NC-SA-4.0
 keywords:
   - agent-based model
   - NetLogo
-  - "[DOMAIN KEYWORD]"
-  - "[DOMAIN KEYWORD]"
+  - underwater visual census
+  - sampling bias
+  - animal density estimation
+  - belt transect
 references:
   - type: article
-    title: "[KEY REFERENCE PAPER TITLE]"
+    title: "Overestimating Fish Counts by Non-Instantaneous Visual Censuses: Consequences for Population and Community Descriptions"
     authors:
-      - family-names: "[LAST NAME]"
-        given-names: "[FIRST NAME]"
-    journal: "[JOURNAL NAME]"
-    year: [YYYY]
-    doi: "[DOI]"
+      - family-names: "Ward-Paige"
+        given-names: "Christine A."
+      - family-names: "Flemming"
+        given-names: "Joanna Mills"
+      - family-names: "Lotze"
+        given-names: "Heike K."
+    journal: "PLoS ONE"
+    year: 2010
+    volume: 5
+    issue: 7
+    doi: "10.1371/journal.pone.0011722"
